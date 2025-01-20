@@ -1,3 +1,17 @@
+# Usage and Shortcuts
+
+TiinySwatch will appear in your system tray as a single colored block. Left clicking the tray icon pulls up a color picker menu. Right clicking the tray icon pulls up the settings, where you can set keybinds. The default settings are as follows:
+```
+Clipboard Format: Hexadecimal
+Screen Capture Keybind: f2
+Toggle Color Picker Keybind: f3
+Toggle Palette Keybind: f4
+Auto Copy To Clipboard: True
+```
+Additionally, you can perform the following actions:
+ - Pressing Ctrl+S while on the color picker will save the current color to the history palette.
+ - Pressing delete on a color in the palette will remove it.
+ - You can navigate through the color palette by clicking or using the arrow keys.
 # Building From Source
 
 The following runs the program using python:
