@@ -1,92 +1,199 @@
-import keyboard
-from PySide6.QtWidgets import QInputDialog, QMenu
-from PySide6.QtGui import QActionGroup, QAction
-from utils import Settings
+from PySide6.QtWidgets import QMenu, QInputDialog
+from PySide6.QtGui import QAction, QActionGroup, QColor
+from utils import Settings, ClipboardManager
+
+CHANGE_KEYBIND_TITLE = "Change Keybind"
+CHANGE_KEYBIND_PROMPT = "Enter the new key:"
+
 
 class SettingsMenu(QMenu):
+    """
+    A unified tray menu containing:
+      - Keybinds submenu
+      - Auto Paste to Clipboard toggle
+      - Color format checkboxes (RGB, HEX, HSV) displaying the current color
+      - Exit
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
-
         self.setTitle("TiinySwatch v1.0")
-        
-        # Keybind settings
-        keybind_action = QAction("Pick Color Keybind", self)
-        keybind_action.triggered.connect(self.change_pick_keybind)
-        self.addAction(keybind_action)
-        
-        toggle_keybind_action = QAction("Popup Keybind", self)
-        toggle_keybind_action.triggered.connect(self.change_toggle_keybind)
-        self.addAction(toggle_keybind_action)
 
-        history_keybind_action = QAction("History Palette Keybind", self)
-        history_keybind_action.triggered.connect(self.change_history_keybind)
-        self.addAction(history_keybind_action)
+        # Listen for color changes so we can update the format action text
+        Settings.addListener("SET", "currentColor", self.updateColorActions)
+        Settings.addListener("SET", "VALUE_ONLY", self.updateColorActions)
 
-        # Color format submenu
-        format_submenu = QMenu("Clipboard Format", self)
-        
-        # Create an action group for mutually exclusive actions
-        self.format_group = QActionGroup(self)
-        
-        self.rgb_action = QAction("RGB", self, checkable=True)
-        self.rgb_action.triggered.connect(lambda: self.set_format("RGB"))
-        self.format_group.addAction(self.rgb_action)
-        format_submenu.addAction(self.rgb_action)
-        
-        self.hex_action = QAction("Hex", self, checkable=True)
-        self.hex_action.triggered.connect(lambda: self.set_format("HEX"))
-        self.format_group.addAction(self.hex_action)
-        format_submenu.addAction(self.hex_action)
-        
-        self.hsv_action = QAction("HSV", self, checkable=True)
-        self.hsv_action.triggered.connect(lambda: self.set_format("HSV"))
-        self.format_group.addAction(self.hsv_action)
-        format_submenu.addAction(self.hsv_action)
-        
-        # Check the action that matches the current global Settings.get("FORMAT")
-        if Settings.get("FORMAT") == "RGB":
-            self.rgb_action.setChecked(True)
-        elif Settings.get("FORMAT") == "HEX":
-            self.hex_action.setChecked(True)
-        elif Settings.get("FORMAT") == "HSV":
-            self.hsv_action.setChecked(True)
-        
-        self.addMenu(format_submenu)
+        # Build the menu in sections
+        self.initKeybindsSubmenu()
+        self.initAutoPasteToggle()
+        self.initValueOnlyCopyToggle()
+        self.addSeparator()
+        self.initFormatActions()
+        self.addSeparator()
+        self.initExitAction()
 
-        self.clipboard_toggle = QAction("Auto Paste to Clipboard", self, checkable=True)
-        self.clipboard_toggle.setChecked(Settings.get("CLIPBOARD"))
-        self.clipboard_toggle.triggered.connect(self.toggle_clipboard)
-        self.addAction(self.clipboard_toggle)
-    
-    def set_format(self, format_str):
-        Settings.set("FORMAT", format_str)
-        if self.parent.color_picker:
-            self.parent.color_picker.update_button_style()
+        # Initial check for whichever format is stored in Settings
+        self.checkCurrentFormat()
 
-    def toggle_clipboard(self, checked):
+        # Update the color text labels now
+        self.updateColorActions(None)
+
+    # ------------------------------------------------------------------
+    #                          Menu Sections
+    # ------------------------------------------------------------------
+    def initKeybindsSubmenu(self):
+        """Create a 'Keybinds' submenu with keybind actions."""
+        keybindsMenu = self.addMenu("Keybinds")
+
+        pickKeybindAction = QAction("Capture Screen", self)
+        pickKeybindAction.triggered.connect(lambda: self.changeKeybind("PICK_KEYBIND"))
+        keybindsMenu.addAction(pickKeybindAction)
+
+        popupKeybindAction = QAction("Toggle Color Picker", self)
+        popupKeybindAction.triggered.connect(lambda: self.changeKeybind("TOGGLE_KEYBIND"))
+        keybindsMenu.addAction(popupKeybindAction)
+
+        historyKeybindAction = QAction("Toggle History Palette", self)
+        historyKeybindAction.triggered.connect(lambda: self.changeKeybind("HISTORY_KEYBIND"))
+        keybindsMenu.addAction(historyKeybindAction)
+
+    def initAutoPasteToggle(self):
+        """Create a checkbox to enable/disable automatic copying to clipboard."""
+        self.clipboardToggleAction = QAction("Auto Paste to Clipboard", self, checkable=True)
+        self.clipboardToggleAction.setChecked(Settings.get("CLIPBOARD"))
+        self.clipboardToggleAction.triggered.connect(self.toggleClipboard)
+        self.addAction(self.clipboardToggleAction)
+
+    def initValueOnlyCopyToggle(self):
+        """Create a checkbox to enable/disable copying values only ("255,100,32" instead of "rgb(255,100,32)"). """
+        self.valueOnlyToggleAction = QAction("Copy Values Only", self, checkable=True)
+        self.valueOnlyToggleAction.setChecked(Settings.get("VALUE_ONLY"))
+        self.valueOnlyToggleAction.triggered.connect(self.toggleValueOnly)
+        self.addAction(self.valueOnlyToggleAction)
+
+    def initFormatActions(self):
+        """
+        Create top-level checkbox actions for each color format (RGB, HEX, HSV).
+        These will show the current color in each format and allow the user
+        to select which format is 'active'.
+        """
+        self.formatActionGroup = QActionGroup(self)
+        self.formatActionGroup.setExclusive(True)
+
+        # HEX Action
+        self.hexAction = QAction("HEX", self, checkable=True)
+        self.hexAction.triggered.connect(lambda checked: self.onFormatSelected("HEX") if checked else None)
+        self.formatActionGroup.addAction(self.hexAction)
+        self.addAction(self.hexAction)
+
+        # RGB Action
+        self.rgbAction = QAction("RGB", self, checkable=True)
+        self.rgbAction.triggered.connect(lambda checked: self.onFormatSelected("RGB") if checked else None)
+        self.formatActionGroup.addAction(self.rgbAction)
+        self.addAction(self.rgbAction)
+
+        # HSV Action
+        self.hsvAction = QAction("HSV", self, checkable=True)
+        self.hsvAction.triggered.connect(lambda checked: self.onFormatSelected("HSV") if checked else None)
+        self.formatActionGroup.addAction(self.hsvAction)
+        self.addAction(self.hsvAction)
+
+        # HSL Action
+        self.hslAction = QAction("HSL", self, checkable=True)
+        self.hslAction.triggered.connect(lambda checked: self.onFormatSelected("HSL") if checked else None)
+        self.formatActionGroup.addAction(self.hslAction)
+        self.addAction(self.hslAction)
+
+        # CMYK Action
+        self.cmykAction = QAction("CMYK", self, checkable=True)
+        self.cmykAction.triggered.connect(lambda checked: self.onFormatSelected("CMYK") if checked else None)
+        self.formatActionGroup.addAction(self.cmykAction)
+        self.addAction(self.cmykAction)
+
+        # LAB Action
+        self.labAction = QAction("LAB", self, checkable=True)
+        self.labAction.triggered.connect(lambda checked: self.onFormatSelected("LAB") if checked else None)
+        self.formatActionGroup.addAction(self.labAction)
+        self.addAction(self.labAction)
+
+    def initExitAction(self):
+        """
+        Create and add the 'Exit' action at the bottom of the menu.
+        Assumes `closeApp` is defined on the parent.
+        """
+        exitAction = QAction("Exit", self)
+        exitAction.triggered.connect(self.parent.closeApp)
+        self.addAction(exitAction)
+
+    # ------------------------------------------------------------------
+    #                          Callbacks
+    # ------------------------------------------------------------------
+    def toggleClipboard(self, checked):
+        """Enable or disable auto-paste to clipboard via Settings."""
         Settings.set("CLIPBOARD", checked)
 
-    def change_pick_keybind(self):
-        
-        key, ok = QInputDialog.getText(None, "Change Keybind", "Enter the new key:")
-        if ok:
-            # Make sure the key is a valid input
-            keyboard.remove_hotkey(Settings.get("PICK_KEYBIND"))
-            Settings.set("PICK_KEYBIND", key)
-            keyboard.add_hotkey(Settings.get("PICK_KEYBIND"), lambda: self.parent.initiateOverlaySignal.emit())
+    def toggleValueOnly(self, checked):
+        Settings.set("VALUE_ONLY", checked)
 
-    def change_toggle_keybind(self):
-        key, ok = QInputDialog.getText(None, "Change Keybind", "Enter the new key:")
-        if ok:
-            keyboard.remove_hotkey(Settings.get("TOGGLE_KEYBIND"))
-            Settings.set("TOGGLE_KEYBIND", key)
-            keyboard.add_hotkey(Settings.get("TOGGLE_KEYBIND"), lambda: self.parent.toggleColorPickerSignal.emit())
+    def changeKeybind(self, settingKey):
+        """Prompt user for a new key and store it under the given settingKey."""
+        key, ok = QInputDialog.getText(None, CHANGE_KEYBIND_TITLE, CHANGE_KEYBIND_PROMPT)
+        if ok and key:
+            Settings.set(settingKey, key)
 
-    def change_history_keybind(self):
-        key, ok = QInputDialog.getText(None, "Change Keybind", "Enter the new key:")
-        if ok:
-            keyboard.remove_hotkey(Settings.get("HISTORY_KEYBIND"))
-            Settings.set("HISTORY_KEYBIND", key)
-            keyboard.add_hotkey(Settings.get("HISTORY_KEYBIND"), lambda: self.parent.toggleColorPickerSignal.emit())
+    def onFormatSelected(self, formatStr):
+        """
+        When the user checks one of the format actions (RGB, HEX, or HSV),
+        update the global 'FORMAT' in Settings and copy the current color
+        in that format to the clipboard (if there's a current color).
+        """
+        Settings.set("FORMAT", formatStr)
+        currentColor = Settings.get("currentColor")
+        if currentColor is not None:
+            # If auto-paste is enabled, copy it now
+            if Settings.get("CLIPBOARD"):
+                ClipboardManager.copyCurrentColorToClipboard()
+
+    # ------------------------------------------------------------------
+    #                          Utility
+    # ------------------------------------------------------------------
+    def checkCurrentFormat(self):
+        """Check whichever format is stored in Settings and mark that action as checked."""
+        currentFormat = Settings.get("FORMAT") or "RGB"
+        if currentFormat == "RGB":
+            self.rgbAction.setChecked(True)
+        elif currentFormat == "HEX":
+            self.hexAction.setChecked(True)
+        elif currentFormat == "HSV":
+            self.hsvAction.setChecked(True)
+        elif currentFormat == "HSL":
+            self.hslAction.setChecked(True)
+        elif currentFormat == "CMYK":
+            self.cmykAction.setChecked(True)
+        elif currentFormat == "LAB":
+            self.labAction.setChecked(True)
+
+    def updateColorActions(self, _):
+        """
+        Update the text for RGB, HEX, and HSV actions based on the current color in Settings.
+        This method is called whenever 'currentColor' changes via Settings.addListener.
+        """
+        color = Settings.get("currentColor")
+        if color is None:
+            color = QColor(255, 255, 255)  # fallback
+
+        # Generate text from ClipboardManager's format templates
+        rgbText = ClipboardManager.getTemplate("RGB")(color) + " (rgb)"
+        hexText = ClipboardManager.getTemplate("HEX")(color) + " (hex)"
+        hsvText = ClipboardManager.getTemplate("HSV")(color) + " (hsv)"
+        hslText = ClipboardManager.getTemplate("HSL")(color) + " (hsl)"
+        cmykText = ClipboardManager.getTemplate("CMYK")(color) + " (cmyk)"
+        labText = ClipboardManager.getTemplate("LAB")(color) + " (lab)"
+
+        self.rgbAction.setText(rgbText)
+        self.hexAction.setText(hexText)
+        self.hsvAction.setText(hsvText)
+        self.hslAction.setText(hslText)
+        self.cmykAction.setText(cmykText)
+        self.labAction.setText(labText)

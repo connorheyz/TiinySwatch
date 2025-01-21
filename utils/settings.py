@@ -1,140 +1,218 @@
 from PySide6.QtCore import QSettings
 from PySide6.QtGui import QColor
+from .color_utils import QColorEnhanced
 
 
 class Settings:
     _qsettings = QSettings('TiinySwatch', 'ColorPickerApp')
-    _settings_dict = {}
-    _listeners = {}
-    _defaults_dict = {
-        'FORMAT': 'HEX',
-        'PICK_KEYBIND': 'f2',
-        'TOGGLE_KEYBIND': 'f3',
-        'HISTORY_KEYBIND': 'f4',
-        'CLIPBOARD': True,
-        'colors': [],
-        'current_color': QColor.fromRgb(255, 255, 255).name()
+    
+    # This dictionary is our "schema" for the settings.
+    # We define each setting exactly once here.
+    #
+    # Keys are the setting names; the value is a dict with:
+    #   "default": the default value
+    #   "load_converter": (optional) function to convert from stored value to runtime value
+    #   "save_converter": (optional) function to convert from runtime value to storeable value
+    #
+    # If a converter is omitted, it’s treated as a direct load/save.
+    #
+    _settingsSchema = {
+        'FORMAT': {
+            'default': 'HEX'
+        },
+        'PICK_KEYBIND': {
+            'default': 'f2'
+        },
+        'TOGGLE_KEYBIND': {
+            'default': 'f3'
+        },
+        'HISTORY_KEYBIND': {
+            'default': 'f4'
+        },
+        'CLIPBOARD': {
+            'default': True,
+            'type': bool
+        },
+        'SLIDER_FORMAT_1': {
+            'default': 'HSV'
+        },
+        'SLIDER_FORMAT_2': {
+            'default': 'RGB'
+        },
+        'VALUE_ONLY': {
+            'default': False,
+            'type': bool
+        },
+        'colors': {
+            'default': [],
+            # Convert a list of color hex strings to a list of QColors when loading,
+            # and the reverse when saving.
+            'load_converter': lambda val: [QColor(c) for c in val] if isinstance(val, list) else [],
+            'save_converter': lambda val: [c.name() for c in val] if isinstance(val, list) else [],
+        },
+        'currentColor': {
+            'default': '#ffffff',
+            # Convert the stored hex string to a QColor, and back to hex on save.
+            'load_converter': lambda val: val.clone() if isinstance(val, QColorEnhanced) else QColorEnhanced(QColor(val)),
+            'save_converter': lambda val: val.qcolor.name() if isinstance(val, QColorEnhanced) else '#ffffff',
+        },
     }
+    
+    # Internal dictionary holding *current* setting values at runtime.
+    _settingsDict = {}
+
+    # Listeners keyed by [key][action], e.g. listeners["FORMAT"]["SET"] = [...]
+    _listeners = {}
 
     @classmethod
     def load(cls):
-        """Load settings from QSettings into the dictionary."""
-        cls._settings_dict = {
-            'FORMAT': cls._qsettings.value('FORMAT', cls._defaults_dict['FORMAT']),
-            'PICK_KEYBIND': cls._qsettings.value('PICK_KEYBIND', cls._defaults_dict['PICK_KEYBIND']),
-            'TOGGLE_KEYBIND': cls._qsettings.value('TOGGLE_KEYBIND', cls._defaults_dict['TOGGLE_KEYBIND']),
-            'HISTORY_KEYBIND': cls._qsettings.value('HISTORY_KEYBIND', cls._defaults_dict['HISTORY_KEYBIND']),
-            'CLIPBOARD': cls._qsettings.value('CLIPBOARD', cls._defaults_dict['CLIPBOARD'], type=bool),
-            'colors': [QColor(color) for color in cls._qsettings.value('colors', cls._defaults_dict['colors'])],
-            'current_color': QColor(cls._qsettings.value('current_color', cls._defaults_dict['current_color']))
-        }
+        """
+        Load settings from QSettings into the in-memory _settingsDict,
+        using the schema for defaults and load_converters.
+        """
+        cls._settingsDict.clear()
+
+        for key, info in cls._settingsSchema.items():
+            default_value = info.get('default')
+            info_type = info.get('type')
+            if info_type:
+                raw_value = cls._qsettings.value(key, default_value, type=info_type)
+            else:
+                raw_value = cls._qsettings.value(key, default_value)
+            load_converter = info.get('load_converter')
+            
+            if load_converter:
+                value = load_converter(raw_value)
+            else:
+                # If no converter is provided, just use the raw value
+                value = raw_value
+
+            cls._settingsDict[key] = value
 
     @classmethod
     def save(cls):
-        """Save the dictionary values back into QSettings."""
-        for key, value in cls._settings_dict.items():
-            if key == 'colors':
-                cls._qsettings.setValue(key, [color.name() for color in value])
+        """
+        Save current _settingsDict back into QSettings,
+        using save_converters where necessary.
+        """
+        for key, value in cls._settingsDict.items():
+            info = cls._settingsSchema[key]
+            save_converter = info.get('save_converter')
+
+            if save_converter:
+                store_value = save_converter(value)
             else:
-                cls._qsettings.setValue(key, value)
+                store_value = value
+
+            cls._qsettings.setValue(key, store_value)
 
     @classmethod
     def get(cls, key):
-        """Get a setting by key and notify listeners."""
-        if key not in cls._settings_dict:
+        """Get a setting by key and notify GET listeners."""
+        if key not in cls._settingsDict:
             raise KeyError(f"{key} is not a valid setting.")
         
-        # Notify listeners for the GET action
-        cls._notify_listeners(key, "GET", cls._settings_dict[key])
-        return cls._settings_dict[key]
-    
-    @classmethod
-    def reset(cls, key):
-        """Set a setting by key and notify listeners."""
-        if key not in cls._settings_dict:
-            raise KeyError(f"{key} is not a valid setting.")
-        
-        cls._settings_dict[key] = cls._defaults_dict[key]
-        
-        # Notify listeners for the SET action
-        cls._notify_listeners(key, "SET", cls._defaults_dict[key])
-        cls.save()
+        value = cls._settingsDict[key]
+        cls._notifyListeners(key, "GET", value)
+        return value
 
     @classmethod
     def set(cls, key, value):
-        """Set a setting by key and notify listeners."""
-        if key not in cls._settings_dict:
+        """Set a setting by key and notify SET listeners."""
+        if key not in cls._settingsDict:
             raise KeyError(f"{key} is not a valid setting.")
-        
-        if key == 'colors':
-            cls._settings_dict[key] = [QColor(color) for color in value]
-        else:
-            cls._settings_dict[key] = value
-        
-        # Notify listeners for the SET action
-        cls._notify_listeners(key, "SET", value)
+
+        # If you have a load_converter on the schema, you might want
+        # to convert incoming data to the right type. For example:
+        load_converter = cls._settingsSchema[key].get('load_converter')
+        if load_converter:
+            value = load_converter(value)
+
+        cls._settingsDict[key] = value
+        cls._notifyListeners(key, "SET", value)
         cls.save()
 
     @classmethod
-    def add_listener(cls, action, key, callback):
+    def reset(cls, key):
+        """Reset a setting to its default value and notify SET listeners."""
+        if key not in cls._settingsDict:
+            raise KeyError(f"{key} is not a valid setting.")
+
+        default_value = cls._settingsSchema[key].get('default')
+        cls._settingsDict[key] = default_value
+        cls._notifyListeners(key, "SET", default_value)
+        cls.save()
+
+    @classmethod
+    def addListener(cls, action, key, callback):
         """
         Add a listener for a specific setting and action.
 
+        :param action: "GET" or "SET"
         :param key: The setting key to listen to.
-        :param action: The action to listen for ("GET" or "SET").
-        :param callback: The method to call when the action occurs.
+        :param callback: The callable to invoke when that action occurs.
         """
         if action not in {"GET", "SET"}:
             raise ValueError("Action must be 'GET' or 'SET'.")
         cls._listeners.setdefault(key, {}).setdefault(action, []).append(callback)
 
     @classmethod
-    def _notify_listeners(cls, key, action, value):
+    def _notifyListeners(cls, key, action, value):
         """Notify all listeners for a specific setting and action."""
         if key in cls._listeners and action in cls._listeners[key]:
             for callback in cls._listeners[key][action]:
                 callback(value)
 
+    # ------------------------------
+    # Color-Specific Convenience Methods
+    # ------------------------------
+
     @classmethod
-    def add_color_to_history(cls, color):
-        """Add a color to the history."""
-        cls._settings_dict['colors'].append(QColor(color))
-        cls._notify_listeners('colors', 'SET', cls._settings_dict['colors'])
+    def appendToHistory(cls, color):
+        """Add a color to the 'colors' history list."""
+        current_list = cls._settingsDict['colors']
+        current_list.append(QColor(color))
+        cls._notifyListeners('colors', 'SET', current_list)
         cls.save()
 
     @classmethod
-    def pop_color_from_history(cls, index):
-        cls._settings_dict['colors'].pop(index)
-        cls._notify_listeners('colors', 'SET', cls._settings_dict['colors'])
+    def removeFromHistory(cls, index):
+        cls._settingsDict['colors'].pop(index)
+        cls._notifyListeners('colors', 'SET', cls._settingsDict['colors'])
         cls.save()
 
     @classmethod
-    def clear_color_history(cls):
+    def clearColorHistory(cls):
         """Clear the color history."""
-        cls._settings_dict['colors'] = []
-        cls._notify_listeners('colors', 'SET', cls._settings_dict['colors'])
+        cls._settingsDict['colors'] = []
+        cls._notifyListeners('colors', 'SET', cls._settingsDict['colors'])
         cls.save()
 
     @classmethod
-    def set_current_color_hsv(cls, hue, sat, val):
-        cls._settings_dict['current_color'].setHsv(hue, sat, val)
-        cls._notify_listeners('current_color', 'SET', cls._settings_dict['current_color'])
+    def setCurrentColorHsv(cls, hue, sat, val):
+        """Set the currentColor setting using HSV values."""
+        color = cls._settingsDict['currentColor']
+        color.setHsv(hue, sat, val)
+        cls._notifyListeners('currentColor', 'SET', color)
         cls.save()
 
     @classmethod
-    def set_current_color_red(cls, red):
-        cls._settings_dict['current_color'].setRed(red)
-        cls._notify_listeners('current_color', 'SET', cls._settings_dict['current_color'])
+    def setCurrentColorRed(cls, red):
+        color = cls._settingsDict['currentColor']
+        color.setRed(red)
+        cls._notifyListeners('currentColor', 'SET', color)
         cls.save()
 
     @classmethod
-    def set_current_color_blue(cls, blue):
-        cls._settings_dict['current_color'].setBlue(blue)
-        cls._notify_listeners('current_color', 'SET', cls._settings_dict['current_color'])
+    def setCurrentColorBlue(cls, blue):
+        color = cls._settingsDict['currentColor']
+        color.setBlue(blue)
+        cls._notifyListeners('currentColor', 'SET', color)
         cls.save()
 
     @classmethod
-    def set_current_color_green(cls, green):
-        cls._settings_dict['current_color'].setGreen(green)
-        cls._notify_listeners('current_color', 'SET', cls._settings_dict['current_color'])
+    def setCurrentColorGreen(cls, green):
+        color = cls._settingsDict['currentColor']
+        color.setGreen(green)
+        cls._notifyListeners('currentColor', 'SET', color)
         cls.save()

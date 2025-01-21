@@ -7,11 +7,13 @@ QWidget {
 QSpinBox {
     background-color: #555;
     border: 1px solid #666;
+    width: 30px;
     height: 1.5em;
 }
 
 QSpinBox::up-button, QSpinBox::down-button {
     background-color: #444;
+    color: white;
     padding: 5px;
 }
 
@@ -54,6 +56,18 @@ QPushButton#ArrowButton {
     color: white;
 }
 
+QPushButton#FormatLabel {
+    background-color: transparent; 
+    border: none;
+    text-align: left;
+    padding-left: 0px;
+    padding-bottom: 0px;
+    width: 30px;
+    margin-bottom: 0px;
+    margin-top: 0px;
+    padding-top: 0px;
+}
+
 QPushButton#ArrowButton:hover {
     background-color: #23a557;
     color: white;
@@ -70,5 +84,38 @@ QLabel#TitleText {
 
 QDialog#TransparentOverlay {
     background: transparent;
+}
+
+/* QMenu Styling */
+QMenu {
+    background-color: #313338;
+    color: #DDD;
+    border: 1px solid #444;
+    padding: 5px;
+}
+
+QMenu::item {
+    background-color: transparent;
+    padding: 5px 20px;
+}
+
+QMenu::item:selected {
+    background-color: #444;
+    color: #DDD;
+}
+
+QMenu::separator {
+    background-color: #555;
+    height: 1px;
+    margin: 5px 0;
+}
+
+QLineEdit {
+    border: 1px solid gray;
+    padding: 4px;
+}
+
+QMenu::icon {
+    padding: 5px;
 }
 """

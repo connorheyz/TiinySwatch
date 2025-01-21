@@ -1,268 +1,273 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QGridLayout,
-    QLabel,
-    QSpacerItem,
-    QSizePolicy,
-    QHBoxLayout,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-    QFileDialog,
-    QMessageBox
+    QGridLayout, QLabel, QSpacerItem, QSizePolicy, QHBoxLayout,
+    QPushButton, QVBoxLayout, QWidget, QFileDialog, QMessageBox
 )
-from PySide6.QtGui import QColor
 from PySide6 import QtCore
+from PySide6.QtGui import QColor
 from functools import partial
-from utils import Settings
+from utils import Settings, ClipboardManager
 import styles
 
-
 class HistoryPalette(QWidget):
+    # Style definitions
+    WINDOW_FLAGS = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | QtCore.Qt.Tool
+    GRID_COLUMNS = 5
+    BUTTON_SIZE = 30
+    
+    STYLES = {
+        'CLOSE_BUTTON': """
+            QPushButton:hover {
+                background-color: #ef5858;
+            }
+        """,
+        'TOP_BAR': "background-color: #1e1f22;",
+        'SELECTED_COLOR': lambda color: f"background-color: {color}; border: 2px solid white",
+        'NORMAL_COLOR': lambda color: f"background-color: {color}; border: none"
+    }
+
     def __init__(self, parent=None):
         super().__init__(None, objectName="HistoryPalette")
         self.parent = parent
+        self.lastMousePosition = None
+        self.currentSelectedButton = -1
+        self.colorButtons = []
+        
+        self.initializeWindow()
+        self.setupUI()
+        self.setupConnections()
+        
+    def initializeWindow(self):
+        """Initialize window properties"""
         self.setStyleSheet(styles.DARK_STYLE)
         self.setMouseTracking(True)
-        self.m_last_position = None
-        self.current_selected_button = -1
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
-        Settings.add_listener("SET", "colors", self.update_colors)
+        self.setWindowFlags(self.WINDOW_FLAGS)
+        
+    def setupConnections(self):
+        """Setup signal connections"""
+        Settings.addListener("SET", "colors", self.updateColors)
+        
+    def setupUI(self):
+        """Initialize the user interface"""
+        mainLayout = QVBoxLayout(self)
+        mainLayout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create UI sections
+        self.createTopBar(mainLayout)
+        self.createColorGrid(mainLayout)
+        self.createBottomBar(mainLayout)
+        
+        self.setLayout(mainLayout)
+        self.updateColors()
+        
+    def createTopBar(self, parentLayout):
+        """Create the top bar with title and close button"""
+        topWidget = QWidget(self)
+        topWidget.setStyleSheet(self.STYLES['TOP_BAR'])
+        
+        topLayout = QHBoxLayout(topWidget)
+        topLayout.setAlignment(Qt.AlignTop)
+        topLayout.setContentsMargins(10, 0, 0, 0)
+        topLayout.setSpacing(0)
+        
+        title = QLabel("History Palette", self)
+        title.setAlignment(Qt.AlignCenter)
+        
+        closeButton = QPushButton("X", self)
+        closeButton.clicked.connect(self.closeWindow)
+        closeButton.setStyleSheet(self.STYLES['CLOSE_BUTTON'])
+        
+        topLayout.addWidget(title)
+        topLayout.addStretch()
+        topLayout.addWidget(closeButton)
+        
+        parentLayout.addWidget(topWidget)
+        
+    def createColorGrid(self, parentLayout):
+        """Create the color grid layout"""
+        self.colorGrid = QGridLayout()
+        self.colorGrid.setContentsMargins(15, 5, 15, 5)
+        self.colorGrid.setSpacing(5)
+        parentLayout.addLayout(self.colorGrid)
+        
+    def createBottomBar(self, parentLayout):
+        """Create the bottom bar with export and clear buttons"""
+        bottomBar = QHBoxLayout()
+        bottomBar.setContentsMargins(15, 0, 15, 15)
+        bottomBar.setAlignment(Qt.AlignBottom)
+        
+        exportBtn = QPushButton("Export", self)
+        exportBtn.clicked.connect(self.exportPalette)
+        
+        trashBtn = QPushButton("Clear All", self)
+        trashBtn.clicked.connect(lambda: Settings.set("colors", []))
+        
+        bottomBar.addWidget(exportBtn)
+        bottomBar.addWidget(trashBtn)
+        parentLayout.addLayout(bottomBar)
+        
+    def updateColors(self, color=None):
+        """Update the color grid with current colors"""
+        self.clearColorGrid()
         self.colorButtons = []
-        self.init_ui()
-
-    def keyPressEvent(self, event):
-        key = event.key()
-
-        if key == Qt.Key_Delete:
-            self.handle_delete_key()
-        elif key == Qt.Key_Left:
-            self.move_selection(-1)
-        elif key == Qt.Key_Right:
-            self.move_selection(1)
-        elif key == Qt.Key_Up:
-            self.move_selection(-5)  # move one row up
-        elif key == Qt.Key_Down:
-            self.move_selection(5)   # move one row down
-        else:
-            # Propagate the event further for keys we don't handle
-            super().keyPressEvent(event)
-
-    def move_selection(self, step):
-        """Moves selection by 'step' positions, with a row size of 5."""
+        
+        colors = Settings.get("colors")
+        for index, color in enumerate(colors):
+            self.addColorButton(index, color)
+            
+        self.addSpacersIfNeeded(len(colors))
+        self.adjustSize()
+        
+    def clearColorGrid(self):
+        """Clear all items from the color grid"""
+        while self.colorGrid.count():
+            item = self.colorGrid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            else:
+                del item
+                
+    def addColorButton(self, index, color):
+        """Add a color button to the grid"""
+        row, col = divmod(index, self.GRID_COLUMNS)
+        
+        colorBtn = QPushButton(self)
+        colorBtn.setFixedSize(self.BUTTON_SIZE, self.BUTTON_SIZE)
+        
+        style = (self.STYLES['SELECTED_COLOR'] if index == self.currentSelectedButton 
+                else self.STYLES['NORMAL_COLOR'])
+        colorBtn.setStyleSheet(style(color.name()))
+        
+        self.colorButtons.append(colorBtn)
+        self.colorGrid.addWidget(colorBtn, row, col)
+        colorBtn.clicked.connect(partial(self.setSelectedButton, index))
+        
+    def addSpacersIfNeeded(self, colorCount):
+        """Add spacers to maintain grid layout"""
+        lastRowItems = colorCount % self.GRID_COLUMNS
+        if lastRowItems:
+            row = colorCount // self.GRID_COLUMNS
+            for i in range(self.GRID_COLUMNS - lastRowItems):
+                spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Minimum)
+                self.colorGrid.addItem(spacer, row, lastRowItems + i)
+                
+    def setSelectedButton(self, newIndex):
+        """Handle color button selection"""
+        if not (0 <= newIndex < len(self.colorButtons)):
+            return
+            
+        # Update previous selection
+        if self.currentSelectedButton != -1:
+            oldBtn = self.colorButtons[self.currentSelectedButton]
+            oldColor = oldBtn.palette().button().color().name()
+            oldBtn.setStyleSheet(self.STYLES['NORMAL_COLOR'](oldColor))
+            
+        # Update new selection
+        newBtn = self.colorButtons[newIndex]
+        newColor = newBtn.palette().button().color()
+        newBtn.setStyleSheet(self.STYLES['SELECTED_COLOR'](newColor.name()))
+        
+        self.currentSelectedButton = newIndex
+        Settings.set("currentColor", QColor(newColor))
+        
+        if Settings.get("CLIPBOARD"):
+            ClipboardManager.copyCurrentColorToClipboard()
+            
+        self.updateColors(None)
+        
+    def moveSelection(self, step):
+        """Move the selection by the given step"""
         if not self.colorButtons:
             return
-
-        # If nothing is currently selected, start with the first color
-        if self.current_selected_button == -1:
-            new_index = 0
+            
+        newIndex = 0 if self.currentSelectedButton == -1 else self.currentSelectedButton + step
+        newIndex = max(0, min(newIndex, len(self.colorButtons) - 1))
+        self.setSelectedButton(newIndex)
+        
+    def handleDeleteKey(self):
+        """Handle delete key press"""
+        if self.currentSelectedButton != -1:
+            oldSelected = self.currentSelectedButton
+            self.currentSelectedButton = -1
+            Settings.removeFromHistory(oldSelected)
+            
+    def exportPalette(self):
+        """Export the color palette"""
+        options = QFileDialog.Options() | QFileDialog.DontUseNativeDialog
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Export Palette", "",
+            "Paint.NET Palette Files (*.txt);;All Files (*)",
+            options=options
+        )
+        
+        if not filename:
+            return
+            
+        try:
+            self.writePaletteFile(filename)
+            QMessageBox.information(self, "Export Successful", 
+                                  f"Palette exported successfully to {filename}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Failed", 
+                               f"An error occurred while exporting the palette:\n{e}")
+            
+    def writePaletteFile(self, filename):
+        """Write the palette to a file"""
+        colors = Settings.get("colors")
+        maxColors = 96
+        
+        with open(filename, 'w') as file:
+            for i in range(maxColors):
+                if i < len(colors):
+                    color = colors[i]
+                    colorHex = f"FF{color.red():02X}{color.green():02X}{color.blue():02X}"
+                else:
+                    colorHex = "FFFFFFFF"
+                file.write(f"{colorHex}\n")
+                
+    def closeWindow(self):
+        """Close the window and update parent state"""
+        self.close()
+        self.parent.historyToggled = False
+        
+    # Event handlers
+    def keyPressEvent(self, event):
+        """Handle key press events"""
+        keyActions = {
+            Qt.Key_Delete: self.handleDeleteKey,
+            Qt.Key_Left: lambda: self.moveSelection(-1),
+            Qt.Key_Right: lambda: self.moveSelection(1),
+            Qt.Key_Up: lambda: self.moveSelection(-self.GRID_COLUMNS),
+            Qt.Key_Down: lambda: self.moveSelection(self.GRID_COLUMNS)
+        }
+        
+        action = keyActions.get(event.key())
+        if action:
+            action()
         else:
-            new_index = self.current_selected_button + step
-
-        # Clamp index to the valid range
-        new_index = max(0, min(new_index, len(self.colorButtons) - 1))
-
-        # Finally, set the new selection
-        self.set_selected_button(new_index)
-
-    def set_selected_button(self, new_index):
-        """Apply highlighting logic for the newly selected button."""
-        if new_index < 0 or new_index >= len(self.colorButtons):
-            return  # Out of valid range
-
-        # Unhighlight previously selected button, if any
-        if self.current_selected_button != -1:
-            old_btn = self.colorButtons[self.current_selected_button]
-            old_color = old_btn.palette().button().color().name()
-            old_btn.setStyleSheet(f"background-color: {old_color}; border: none")
-
-        # Highlight the new selection
-        new_btn = self.colorButtons[new_index]
-        new_color = new_btn.palette().button().color()  # This is a QColor
-        new_btn.setStyleSheet(f"background-color: {new_color.name()}; border: 2px solid white")
-
-        # Update our tracking
-        self.current_selected_button = new_index
-        # Update Settings with the newly selected color
-        Settings.set("current_color", QColor(new_color))
-
-        # If clipboard option is on, copy to clipboard
-        if Settings.get("CLIPBOARD"):
-            self.parent.parent.copy_color_to_clipboard()
-
-        self.update_colors(None)
-
-    def handle_delete_key(self):
-        if self.current_selected_button != -1:
-            old_selected_button = self.current_selected_button
-            self.current_selected_button = -1
-            Settings.pop_color_from_history(old_selected_button)
+            super().keyPressEvent(event)
             
     def mousePressEvent(self, event):
+        """Handle mouse press events"""
         if event.button() == Qt.LeftButton:
-            self.m_last_position = event.pos()
+            self.lastMousePosition = event.pos()
             event.accept()
         else:
             super().mousePressEvent(event)
-
+            
     def mouseMoveEvent(self, event):
-        if self.m_last_position is not None:
-            delta = event.pos() - self.m_last_position
+        """Handle mouse move events"""
+        if self.lastMousePosition:
+            delta = event.pos() - self.lastMousePosition
             self.move(self.pos() + delta)
             event.accept()
         else:
             super().mouseMoveEvent(event)
-
+            
     def mouseReleaseEvent(self, event):
+        """Handle mouse release events"""
         if event.button() == Qt.LeftButton:
-            self.m_last_position = None
+            self.lastMousePosition = None
             event.accept()
         else:
             super().mouseReleaseEvent(event)
-
-    def init_ui(self):
-        # Main layout
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-
-        # Top bar
-        self.init_top_bar()
-
-        # Color grid
-        self.colorGrid = QGridLayout()
-        self.colorGrid.setContentsMargins(15, 5, 15, 5)
-        self.colorGrid.setSpacing(5)  # Adjust spacing between color squares
-        self.layout.addLayout(self.colorGrid)
-
-        # Bottom bar
-        self.init_bottom_bar()
-
-        # Set main layout to widget
-        self.setLayout(self.layout)
-        self.update_colors(None)
-
-    def init_top_bar(self):
-        topWidget = QWidget(self)
-        topLayout = QHBoxLayout(topWidget)
-        topLayout.setAlignment(Qt.AlignTop)
-        topLayout.setContentsMargins(10, 0, 0, 0)
-
-        # Title
-        title = QLabel("History Palette", self)
-        title.setAlignment(Qt.AlignCenter)
-
-        # Close button
-        closeButton = QPushButton("X", self)
-        closeButton.clicked.connect(self.close_window)
-        closeButton.setStyleSheet("""
-            QPushButton:hover {
-                background-color: #ef5858;
-            }
-        """)
-
-        topLayout.addWidget(title)
-        topLayout.addStretch()
-        topLayout.addWidget(closeButton)
-        topLayout.setSpacing(0)
-        topWidget.setStyleSheet("background-color: #1e1f22;")
-
-        self.layout.addWidget(topWidget)
-
-    def close_window(self):
-        self.close()
-        self.parent.history_toggled = False
-
-    def init_bottom_bar(self):
-        bottomBar = QHBoxLayout()
-        bottomBar.setContentsMargins(15, 0, 15, 15)
-        bottomBar.setAlignment(Qt.AlignBottom)
-
-        exportBtn = QPushButton("Export", self)
-        exportBtn.clicked.connect(self.on_export_clicked)
-
-        trashBtn = QPushButton("Clear All", self)
-        trashBtn.clicked.connect(self.on_trash_clicked)
-
-        bottomBar.addWidget(exportBtn)
-        bottomBar.addWidget(trashBtn)
-        self.layout.addLayout(bottomBar)
-
-    def update_colors(self, color=None):
-        # Clear existing items
-        for i in reversed(range(self.colorGrid.count())):
-            item = self.colorGrid.itemAt(i)
-            if item.widget():
-                item.widget().deleteLater()
-            else:
-                # Remove spacer items
-                self.colorGrid.removeItem(item)
-                del item
-
-        self.colorButtons = []
-
-        COLS = 5
-        colors = Settings.get("colors")
-        for index, color in enumerate(colors):
-            row = index // COLS
-            col = index % COLS
-            color_btn = QPushButton(self)
-            if index == self.current_selected_button:
-                color_btn.setStyleSheet(f"background-color: {color.name()}; border: 2px solid white")
-            else:
-                color_btn.setStyleSheet(f"background-color: {color.name()}; border: none")
-            color_btn.setFixedSize(30, 30)  # Size of color squares
-            self.colorButtons.append(color_btn)
-            self.colorGrid.addWidget(color_btn, row, col)
-
-            # Connect the clicked signal
-            color_btn.clicked.connect(partial(self.set_selected_button, index))
-
-        # Ensure fixed width by adding horizontal spacers for every incomplete row
-        last_row_items = len(colors) % COLS
-        if last_row_items:
-            row = len(colors) // COLS
-            for spacer_index in range(COLS - last_row_items):
-                spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Minimum)
-                self.colorGrid.addItem(spacer, row, last_row_items + spacer_index)
-        else:
-            # Remove any leftover spacers if the last row is complete
-            for i in reversed(range(self.colorGrid.count())):
-                item = self.colorGrid.itemAt(i)
-                if not item.widget():
-                    self.colorGrid.removeItem(item)
-                    del item
-
-        self.adjustSize()
-
-    def on_export_clicked(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Export Palette",
-            "",
-            "Paint.NET Palette Files (*.txt);;All Files (*)",
-            options=options
-        )
-        if filename:
-            try:
-                with open(filename, 'w') as file:
-                    colors = Settings.get("colors")
-                    max_colors = 96
-                    for i in range(max_colors):
-                        if i < len(colors):
-                            color = colors[i]
-                            aa = 'FF'  # Fully opaque
-                            rr = f"{color.red():02X}"
-                            gg = f"{color.green():02X}"
-                            bb = f"{color.blue():02X}"
-                            color_hex = f"{aa}{rr}{gg}{bb}"
-                        else:
-                            color_hex = "FFFFFFFF"  # White color
-                        file.write(f"{color_hex}\n")
-                QMessageBox.information(self, "Export Successful", f"Palette exported successfully to {filename}")
-            except Exception as e:
-                QMessageBox.critical(self, "Export Failed", f"An error occurred while exporting the palette:\n{e}")
-
-    def on_trash_clicked(self):
-        Settings.set("colors", [])

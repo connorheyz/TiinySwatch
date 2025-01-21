@@ -1,158 +1,122 @@
-import keyboard
-from PySide6.QtCore import Signal, QSize
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon, QMenu
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QCursor, QGuiApplication, QBrush, QAction
-from utils import Settings
+from PySide6.QtGui import (QIcon, QPixmap, QPainter, QCursor, QGuiApplication, 
+                          QBrush, QAction)
+from utils import Settings, KeybindManager
 from dialogs import TransparentOverlay
 from widgets import ColorPicker
 from menus import SettingsMenu
+import styles
 
 class App(QMainWindow):
+    # Constants
+    ICON_SIZE = 16
+    DEFAULT_WINDOW_GEOMETRY = (300, 300, 250, 150)
 
+    # Signals
     initiateOverlaySignal = Signal()
     toggleColorPickerSignal = Signal()
     toggleHistoryWidgetSignal = Signal()
 
-    def copy_color_to_clipboard(self):
-        clipboard = QApplication.clipboard()
-        if (Settings.get("FORMAT") == "HEX"): 
-            clipboard.setText(Settings.get("current_color").name())
-        elif (Settings.get("FORMAT") == "HSV"):
-            text = str(Settings.get("current_color").hsvHue()) + ", " + str(Settings.get("current_color").hsvSaturation()) + ", " + str(Settings.get("current_color").value())
-            clipboard.setText(text)
-        elif (Settings.get("FORMAT") == "RGB"):
-            text = str(Settings.get("current_color").red()) + ", " + str(Settings.get("current_color").green()) + ", " + str(Settings.get("current_color").blue())
-            clipboard.setText(text)
-
     def __init__(self):
         super().__init__()
-        self.init_ui()
-        self.color_picker = None
+        Settings.load()
+        KeybindManager.initialize(self)
+        self.colorPicker = None
         self.overlay = None
-        self.initiateOverlaySignal.connect(self.initiate_color_pick)
-        self.toggleColorPickerSignal.connect(self.toggle_color_picker)
-        self.toggleHistoryWidgetSignal.connect(self.toggle_history_widget)
-        self.picker_toggled = False
-        Settings.add_listener("SET", "current_color", self.update_color_info)
-        try:
-            keyboard.add_hotkey(Settings.get("PICK_KEYBIND"), lambda: self.initiateOverlaySignal.emit())
-        except:
-            Settings.reset("PICK_KEYBIND")
-            keyboard.add_hotkey(Settings.get("PICK_KEYBIND"), lambda: self.initiateOverlaySignal.emit())
-        try:
-            keyboard.add_hotkey(Settings.get("TOGGLE_KEYBIND"), lambda: self.toggleColorPickerSignal.emit())
-        except:
-            Settings.reset("TOGGLE_KEYBIND")
-            keyboard.add_hotkey(Settings.get("TOGGLE_KEYBIND"), lambda: self.toggleColorPickerSignal.emit())
-        try:
-            keyboard.add_hotkey(Settings.get("HISTORY_KEYBIND"), lambda: self.toggleHistoryWidgetSignal.emit())
-        except:
-            Settings.reset("HISTORY_KEYBIND")
-            keyboard.add_hotkey(Settings.get("HISTORY_KEYBIND"), lambda: self.toggleHistoryWidgetSignal.emit())
-
-    def toggle_color_picker(self):
-        if not self.picker_toggled:
-            if not self.color_picker:
-                self.color_picker = ColorPicker(self)
-                self.color_picker.show()
-                mouse_position = QCursor.pos()
-                self.color_picker.move(mouse_position.x() - self.color_picker.width(), mouse_position.y() - self.color_picker.height())
-            self.picker_toggled = True
-            self.color_picker.show()
-        else:
-            if self.color_picker:
-                self.color_picker.close()
-            self.picker_toggled = False
-
-    def toggle_history_widget(self):
-        if self.color_picker:
-            self.color_picker.toggle_history_widget()
-
-    def create_tray_menu(self):
-        self.trayIconMenu = QMenu(self)
-
-        self.settingsMenu = SettingsMenu(self)
-        self.settingsAction = QAction("Settings", self)
-        self.settingsAction.setMenu(self.settingsMenu)
-        # Add it to the tray menu
-        self.trayIconMenu.addAction(self.settingsAction)
+        self.pickerToggled = False
+        self.setStyleSheet(styles.DARK_STYLE)
         
-        self.rgbAction = QAction("RGB: (255, 255, 255)", self)
-        self.rgbAction.setEnabled(False)  # Disable so it can't be clicked
-        
-        self.hexAction = QAction("HEX: #FFFFFF", self)
-        self.hexAction.setEnabled(False)
-        
-        self.hsvAction = QAction("HSV: (360, 100%, 100%)", self)
-        self.hsvAction.setEnabled(False)
-        
-        exitAction = QAction("Exit", self)
-        exitAction.triggered.connect(self.close_app)
-        
-        self.trayIconMenu.addAction(self.rgbAction)
-        self.trayIconMenu.addAction(self.hexAction)
-        self.trayIconMenu.addAction(self.hsvAction)
-        self.trayIconMenu.addSeparator()
-        self.trayIconMenu.addAction(exitAction)
+        self.initializeUI()
+        self.setupSignals()
+        self.setupHotkeys()
 
-        self.trayIcon.setContextMenu(self.trayIconMenu)
-
-    def init_ui(self):
-        # Main window properties (you can hide this if you only want the tray icon)
+    def initializeUI(self):
+        """Initialize the main UI components"""
         self.setWindowTitle('Color Picker Tray App')
-        self.setGeometry(300, 300, 250, 150)
-
-        # System Tray setup
-        self.trayIcon = QSystemTrayIcon(self)
-        self.trayIcon.setIcon(self.create_colored_icon(Settings.get("current_color")))  # Start with a red icon
-        self.trayIcon.activated.connect(self.tray_activation)
-
-        # Tray Menu (Right-click menu)
-        self.create_tray_menu()
-        self.trayIcon.show()
+        self.setGeometry(*self.DEFAULT_WINDOW_GEOMETRY)
         
+        # Setup system tray
+        self.trayIcon = QSystemTrayIcon(self)
+        self.trayIcon.setIcon(self.createColoredIcon(Settings.get("currentColor").qcolor))
+        self.trayIcon.activated.connect(self.onTrayActivation)
+        
+        self.setupTrayMenu()
+        self.trayIcon.show()
 
-    def update_color_info(self, color):
-        r, g, b, _ = Settings.get("current_color").getRgb()  # _ is for alpha, which we don't use here
-        hsv = Settings.get("current_color").hsvHue(), Settings.get("current_color").hsvSaturation(), Settings.get("current_color").value()
+    def setupSignals(self):
+        """Setup signal connections"""
+        self.initiateOverlaySignal.connect(self.initiateColorPick)
+        self.toggleColorPickerSignal.connect(self.toggleColorPicker)
+        self.toggleHistoryWidgetSignal.connect(self.toggleHistoryWidget)
+        Settings.addListener("SET", "currentColor", self.updateColorInfo)
 
-        # Construct the color information strings
-        rgb_info = f"RGB: {r}, {g}, {b}"
-        hex_info = f"Hex: #{Settings.get("current_color").name()[1:]}"  # Extracts the hex code and removes the '#' prefix
-        hsv_info = f"HSV: {hsv[0]}, {hsv[1]}, {hsv[2]}"
+    def setupHotkeys(self):
+        """Setup keyboard shortcuts"""
+        KeybindManager.bindKey("PICK_KEYBIND", lambda: self.initiateOverlaySignal.emit())
+        KeybindManager.bindKey("TOGGLE_KEYBIND", lambda: self.toggleColorPickerSignal.emit())
+        KeybindManager.bindKey("HISTORY_KEYBIND", lambda: self.toggleHistoryWidgetSignal.emit())
 
-        # Update the menu actions
-        self.rgbAction.setText(rgb_info)
-        self.hexAction.setText(hex_info)
-        self.hsvAction.setText(hsv_info)
+    def setupTrayMenu(self):
+        """Set up the system tray menu using the consolidated SettingsMenu."""
+        # Create an instance of the unified menu
+        self.trayMenu = SettingsMenu(self)
+        
+        # Attach it to the tray icon
+        self.trayIcon.setContextMenu(self.trayMenu)
 
-        self.trayIcon.setIcon(self.create_colored_icon(Settings.get("current_color")))
+    def toggleColorPicker(self):
+        """Toggle the color picker visibility"""
+        if not self.pickerToggled:
+            if not self.colorPicker:
+                self.colorPicker = ColorPicker(self)
+                mousePos = QCursor.pos()
+                self.colorPicker.move(
+                    mousePos.x() - self.colorPicker.width(),
+                    mousePos.y() - self.colorPicker.height()
+                )
+            self.colorPicker.show()
+            self.pickerToggled = True
+        else:
+            if self.colorPicker:
+                self.colorPicker.close()
+            self.pickerToggled = False
 
-    def initiate_color_pick(self):
-        # Taking a screenshot
+    def toggleHistoryWidget(self):
+        """Toggle the color history widget"""
+        if self.colorPicker:
+            self.colorPicker.toggleHistoryWidget()
+
+    def updateColorInfo(self, color):
+        # Update tray icon
+        self.trayIcon.setIcon(self.createColoredIcon(color.qcolor))
+
+    def initiateColorPick(self):
+        """Start the color picking process"""
         screen = QGuiApplication.primaryScreen()
         dpi = screen.devicePixelRatio()
         screenshot = screen.grabWindow(0).toImage()
         screenshot = screenshot.scaled(screenshot.size()/dpi)
-            
-        # Display the transparent overlay with 'self' as the parent
-        if (self.overlay == None):
+        
+        if not self.overlay:
             self.overlay = TransparentOverlay(self, screenshot)
             self.overlay.show()
 
-    def tray_activation(self, reason):
+    def onTrayActivation(self, reason):
+        """Handle tray icon activation"""
         if reason == QSystemTrayIcon.Trigger:
-            self.toggle_color_picker()
+            self.toggleColorPicker()
 
-    def create_colored_icon(self, color):
-        pixmap = QPixmap(16, 16)
+    def createColoredIcon(self, color):
+        """Create a colored icon for the system tray"""
+        pixmap = QPixmap(self.ICON_SIZE, self.ICON_SIZE)
         painter = QPainter(pixmap)
-        painter.fillRect(0, 0, 16, 16, QBrush(color))
+        painter.fillRect(0, 0, self.ICON_SIZE, self.ICON_SIZE, QBrush(color))
         painter.end()
         return QIcon(pixmap)
 
-    def close_app(self):
+    def closeApp(self):
+        """Clean up and close the application"""
         self.trayIcon.hide()
         Settings.save()
-
         QApplication.quit()
