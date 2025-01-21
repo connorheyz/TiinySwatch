@@ -12,6 +12,7 @@ Additionally, you can perform the following actions:
  - Pressing Ctrl+S while on the color picker will save the current color to the history palette.
  - Pressing delete on a color in the palette will remove it.
  - You can navigate through the color palette by clicking or using the arrow keys.
+ - Clicking on the RGB or HSV tabs in the color picker will allow you to change the color format.
  - The export button in the history palette exports to Paint.NET's palette format.
 # Building From Source
 
