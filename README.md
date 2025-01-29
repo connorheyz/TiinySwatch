@@ -22,7 +22,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The following builds the program to your local machine:
+The following builds the program to your local machine in EXE format (Windows only):
 ```
 pip install -r requirements.txt
 pyinstaller TiinySwatch.spec
