@@ -66,7 +66,7 @@ class SettingsMenu(QMenu):
         self.addAction(self.clipboardToggleAction)
 
     def initValueOnlyCopyToggle(self):
-        """Create a checkbox to enable/disable copying values only ("255,100,32" instead of "rgb(255,100,32)"). """
+        """Create a checkbox to enable/disable copying values only ("236, 82, 16" instead of "rgb(236, 82, 16)"). """
         self.valueOnlyToggleAction = QAction("Copy Values Only", self, checkable=True)
         self.valueOnlyToggleAction.setChecked(Settings.get("VALUE_ONLY"))
         self.valueOnlyToggleAction.triggered.connect(self.toggleValueOnly)

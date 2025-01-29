@@ -1,7 +1,7 @@
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon, QMenu
+from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon
 from PySide6.QtGui import (QIcon, QPixmap, QPainter, QCursor, QGuiApplication, 
-                          QBrush, QAction)
+                          QBrush)
 from utils import Settings, KeybindManager
 from dialogs import TransparentOverlay
 from widgets import ColorPicker

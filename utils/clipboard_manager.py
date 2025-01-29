@@ -26,8 +26,8 @@ class ClipboardManager:
             "value_only": lambda color: f"{int((color.cyan()/255.0) * 100)}%, {int((color.magenta()/255.0) * 100)}%, {int((color.yellow()/255.0) * 100)}%, {int((color.black()/255.0) * 100)}%",
         },
         "LAB": {
-            "full": lambda color: f"lab({int(color.getLabLightness())}, {int(color.getLabA())}, {int(color.getLabB())})",
-            "value_only": lambda color: f"{int(color.getLabLightness())}, {int(color.getLabA())}, {int(color.getLabB())}",
+            "full": lambda color: f"lab({int(color.getLab()['L'])}, {int(color.getLab()['a'])}, {int(color.getLab()['b'])})",
+            "value_only": lambda color: f"{int(color.getLab()['L'])}, {int(color.getLab()['a'])}, {int(color.getLab()['b'])}",
         }
     }
 

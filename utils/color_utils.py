@@ -33,9 +33,6 @@ class QColorEnhanced:
         #
         # If a space has special parameters like observer/illuminant or is_upscaled,
         # store them here so they're used properly in conversion. 
-        #
-        # NOTE: For demonstration, I'm using standard 'd50' / observer='2' where relevant.
-        # Adjust to your needs (like 'd65' or another illuminant).
         self._color_spaces = {
             'lab': {
                 'components': {'L': 0.0, 'a': 0.0, 'b': 0.0},
@@ -272,191 +269,76 @@ class QColorEnhanced:
     # -----------------------------------------------------------
     # (Preserve your existing interface, just route through the new dict.)
 
-    def getLabLightness(self):
+    def getLab(self):
         self._ensureSpaceInSync('lab')
-        return self._color_spaces['lab']['components']['L']
+        return self._color_spaces['lab']['components']
 
-    def getLabA(self):
-        self._ensureSpaceInSync('lab')
-        return self._color_spaces['lab']['components']['a']
-
-    def getLabB(self):
-        self._ensureSpaceInSync('lab')
-        return self._color_spaces['lab']['components']['b']
-
-    def setLab(self, lightness, a, b):
+    def setLab(self, L=None, a=None, b=None):
         lab_data = self._color_spaces['lab']['components']
-        lab_data['L'] = lightness
-        lab_data['a'] = a
-        lab_data['b'] = b
+        lab_data['L'] = L or lab_data['L']
+        lab_data['a'] = a or lab_data['a']
+        lab_data['b'] = b or lab_data['b']
 
-        self._syncQColorFromSpace('lab')
-
-    def setLabLightness(self, lightness):
-        self._ensureSpaceInSync('lab')
-        self._color_spaces['lab']['components']['L'] = lightness
-        self._syncQColorFromSpace('lab')
-
-    def setLabA(self, a):
-        self._ensureSpaceInSync('lab')
-        self._color_spaces['lab']['components']['a'] = a
-        self._syncQColorFromSpace('lab')
-
-    def setLabB(self, b):
-        self._ensureSpaceInSync('lab')
-        self._color_spaces['lab']['components']['b'] = b
         self._syncQColorFromSpace('lab')
 
     # -----------------------------------------------------------
     # XYZ getters and setters
     # -----------------------------------------------------------
 
-    def getXYZx(self):
+    def getXYZ(self):
         self._ensureSpaceInSync('xyz')
-        return self._color_spaces['xyz']['components']['x']
+        return self._color_spaces['xyz']['components']
 
-    def getXYZy(self):
-        self._ensureSpaceInSync('xyz')
-        return self._color_spaces['xyz']['components']['y']
-
-    def getXYZz(self):
-        self._ensureSpaceInSync('xyz')
-        return self._color_spaces['xyz']['components']['z']
-
-    def setXYZ(self, x, y, z):
+    def setXYZ(self, x=None, y=None, z=None):
         xyz_data = self._color_spaces['xyz']['components']
-        xyz_data['x'] = x
-        xyz_data['y'] = y
-        xyz_data['z'] = z
-        self._syncQColorFromSpace('xyz')
-
-    def setXYZx(self, x):
-        self._ensureSpaceInSync('xyz')
-        self._color_spaces['xyz']['components']['x'] = x
-        self._syncQColorFromSpace('xyz')
-
-    def setXYZy(self, y):
-        self._ensureSpaceInSync('xyz')
-        self._color_spaces['xyz']['components']['y'] = y
-        self._syncQColorFromSpace('xyz')
-
-    def setXYZz(self, z):
-        self._ensureSpaceInSync('xyz')
-        self._color_spaces['xyz']['components']['z'] = z
+        xyz_data['x'] = x if x is not None else xyz_data['x']
+        xyz_data['y'] = y if y is not None else xyz_data['y']
+        xyz_data['z'] = z if z is not None else xyz_data['z']
         self._syncQColorFromSpace('xyz')
 
     # -----------------------------------------------------------
     # xyY getters and setters
     # -----------------------------------------------------------
 
-    def getxyYX(self):
+    def getxyY(self):
         self._ensureSpaceInSync('xyy')
-        return self._color_spaces['xyy']['components']['x']
+        return self._color_spaces['xyy']['components']
 
-    def getxyYY(self):
-        self._ensureSpaceInSync('xyy')
-        return self._color_spaces['xyy']['components']['y']
-
-    def getxyYYcapital(self):
-        self._ensureSpaceInSync('xyy')
-        return self._color_spaces['xyy']['components']['Y']
-
-    def setxyY(self, x, y, Y):
+    def setxyY(self, x=None, y=None, Y=None):
         xyy_data = self._color_spaces['xyy']['components']
-        xyy_data['x'] = x
-        xyy_data['y'] = y
-        xyy_data['Y'] = Y
-        self._syncQColorFromSpace('xyy')
-
-    def setxyYX(self, x):
-        self._ensureSpaceInSync('xyy')
-        self._color_spaces['xyy']['components']['x'] = x
-        self._syncQColorFromSpace('xyy')
-
-    def setxyYY(self, y):
-        self._ensureSpaceInSync('xyy')
-        self._color_spaces['xyy']['components']['y'] = y
-        self._syncQColorFromSpace('xyy')
-
-    def setxyYYcapital(self, Y):
-        self._ensureSpaceInSync('xyy')
-        self._color_spaces['xyy']['components']['Y'] = Y
+        xyy_data['x'] = x if x is not None else xyy_data['x']
+        xyy_data['y'] = y if y is not None else xyy_data['y']
+        xyy_data['Y'] = Y if Y is not None else xyy_data['Y']
         self._syncQColorFromSpace('xyy')
 
     # -----------------------------------------------------------
     # Luv getters and setters
     # -----------------------------------------------------------
 
-    def getLuvL(self):
+    def getLuv(self):
         self._ensureSpaceInSync('luv')
-        return self._color_spaces['luv']['components']['L']
+        return self._color_spaces['luv']['components']
 
-    def getLuvU(self):
-        self._ensureSpaceInSync('luv')
-        return self._color_spaces['luv']['components']['u']
-
-    def getLuvV(self):
-        self._ensureSpaceInSync('luv')
-        return self._color_spaces['luv']['components']['v']
-
-    def setLuv(self, L, u, v):
+    def setLuv(self, L=None, u=None, v=None):
         luv_data = self._color_spaces['luv']['components']
-        luv_data['L'] = L
-        luv_data['u'] = u
-        luv_data['v'] = v
-        self._syncQColorFromSpace('luv')
-
-    def setLuvL(self, L):
-        self._ensureSpaceInSync('luv')
-        self._color_spaces['luv']['components']['L'] = L
-        self._syncQColorFromSpace('luv')
-
-    def setLuvU(self, u):
-        self._ensureSpaceInSync('luv')
-        self._color_spaces['luv']['components']['u'] = u
-        self._syncQColorFromSpace('luv')
-
-    def setLuvV(self, v):
-        self._ensureSpaceInSync('luv')
-        self._color_spaces['luv']['components']['v'] = v
+        luv_data['L'] = L if L is not None else luv_data['L']
+        luv_data['u'] = u if u is not None else luv_data['u']
+        luv_data['v'] = v if v is not None else luv_data['v']
         self._syncQColorFromSpace('luv')
 
     # -----------------------------------------------------------
     # AdobeRGB getters and setters
     # -----------------------------------------------------------
 
-    def getAdobeR(self):
+    def getAdobeRGB(self):
         self._ensureSpaceInSync('adobe_rgb')
-        return self._color_spaces['adobe_rgb']['components']['r']
+        return self._color_spaces['adobe_rgb']['components']
 
-    def getAdobeG(self):
-        self._ensureSpaceInSync('adobe_rgb')
-        return self._color_spaces['adobe_rgb']['components']['g']
-
-    def getAdobeB(self):
-        self._ensureSpaceInSync('adobe_rgb')
-        return self._color_spaces['adobe_rgb']['components']['b']
-
-    def setAdobeRGB(self, r, g, b):
+    def setAdobeRGB(self, r=None, g=None, b=None):
         adobe_data = self._color_spaces['adobe_rgb']['components']
-        adobe_data['r'] = r
-        adobe_data['g'] = g
-        adobe_data['b'] = b
-        self._syncQColorFromSpace('adobe_rgb')
-
-    def setAdobeR(self, r):
-        self._ensureSpaceInSync('adobe_rgb')
-        self._color_spaces['adobe_rgb']['components']['r'] = r
-        self._syncQColorFromSpace('adobe_rgb')
-
-    def setAdobeG(self, g):
-        self._ensureSpaceInSync('adobe_rgb')
-        self._color_spaces['adobe_rgb']['components']['g'] = g
-        self._syncQColorFromSpace('adobe_rgb')
-
-    def setAdobeB(self, b):
-        self._ensureSpaceInSync('adobe_rgb')
-        self._color_spaces['adobe_rgb']['components']['b'] = b
+        adobe_data['r'] = r if r is not None else adobe_data['r']
+        adobe_data['g'] = g if g is not None else adobe_data['g']
+        adobe_data['b'] = b if b is not None else adobe_data['b']
         self._syncQColorFromSpace('adobe_rgb')
 
     # If you need to toggle is_upscaled for Adobe, you can add a setter here:

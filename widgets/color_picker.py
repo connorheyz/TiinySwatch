@@ -125,22 +125,22 @@ class ColorPicker(QWidget):
             "actualRange": (0, 100),
             "sliderRange": (0, 100),
             "steps": 10,
-            "get": lambda c: c.getLabLightness(),
-            "set": lambda c, v: c.setLabLightness(v)
+            "get": lambda c: c.getLab()['L'],
+            "set": lambda c, v: c.setLab(L=v)
         },
         "LABA": {
             "actualRange": (-128, 127),
             "sliderRange": (-128, 127),
             "steps": 10,
-            "get": lambda c: c.getLabA(),
-            "set": lambda c, v: c.setLabA(v)
+            "get": lambda c: c.getLab()['a'],
+            "set": lambda c, v: c.setLab(a=v)
         },
         "LABB": {
             "actualRange": (-128, 127),
             "sliderRange": (-128, 127),
             "steps": 10,
-            "get": lambda c: c.getLabB(),
-            "set": lambda c, v: c.setLabB(v)
+            "get": lambda c: c.getLab()['b'],
+            "set": lambda c, v: c.setLab(b=v)
         },
 
         # -------------------------------------------------------------
@@ -151,44 +151,44 @@ class ColorPicker(QWidget):
             "actualRange": (0, 1.0),
             "sliderRange": (0, 100),
             "steps": 10,
-            "get": lambda c: c.getXYZx(),
-            "set": lambda c, v: c.setXYZx(v)
+            "get": lambda c: c.getXYZ()['x'],
+            "set": lambda c, v: c.setXYZ(x=v)
         },
         "XYZY": {
             "actualRange": (0, 1.0),
             "sliderRange": (0, 100),
             "steps": 10,
-            "get": lambda c: c.getXYZy(),
-            "set": lambda c, v: c.setXYZy(v)
+            "get": lambda c: c.getXYZ()['y'],
+            "set": lambda c, v: c.setXYZ(y=v)
         },
         "XYZZ": {
             "actualRange": (0, 1.0),
             "sliderRange": (0, 100),
             "steps": 10,
-            "get": lambda c: c.getXYZz(),
-            "set": lambda c, v: c.setXYZz(v)
+            "get": lambda c: c.getXYZ()['z'],
+            "set": lambda c, v: c.setXYZ(z=v)
         },
         "LuvL": {
             # L in [0..100], while u,v can be roughly [-100..100]
             "actualRange": (0, 100),
             "sliderRange": (0, 100),
             "steps": 25,
-            "get": lambda c: c.getLuvL(),
-            "set": lambda c, v: c.setLuvL(v)
+            "get": lambda c: c.getLuv()['L'],
+            "set": lambda c, v: c.setLuv(L=v)
         },
         "LuvU": {
             "actualRange": (-100, 100),
             "sliderRange": (-100, 100),
             "steps": 25,
-            "get": lambda c: c.getLuvU(),
-            "set": lambda c, v: c.setLuvU(v)
+            "get": lambda c: c.getLuv()['u'],
+            "set": lambda c, v: c.setLuv(u=v)
         },
         "LuvV": {
             "actualRange": (-100, 100),
             "sliderRange": (-100, 100),
             "steps": 25,
-            "get": lambda c: c.getLuvV(),
-            "set": lambda c, v: c.setLuvV(v)
+            "get": lambda c: c.getLuv()['v'],
+            "set": lambda c, v: c.setLuv(v=v)
         },
     }
 
