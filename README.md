@@ -1,5 +1,7 @@
 # Usage and Shortcuts
+
 ![alt text](screenshot.png "Title")
+
 TiinySwatch will appear in your system tray as a single colored block. Left clicking the tray icon pulls up a color picker menu. Right clicking the tray icon pulls up the settings, where you can set keybinds. The default settings are as follows:
 ```
 Clipboard Format: Hexadecimal
