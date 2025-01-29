@@ -1,3 +1,4 @@
-keyboard
-pyside6==6.6.1
-colormath
+colormath==3.0.0
+numpy==1.26.4
+pyinstaller==6.11.1
+PySide6==6.6.1

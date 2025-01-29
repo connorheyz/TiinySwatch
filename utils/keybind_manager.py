@@ -1,187 +1,171 @@
-import keyboard
+import sys
+import ctypes
+import ctypes.wintypes
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QWidget
 from utils import Settings
 
-class KeybindManager:
-    """
-    Manages keyboard hotkeys based on the keys defined in the Settings class.
+# Windows API constants
+WM_HOTKEY = 0x0312
+MOD_ALT = 0x0001
+MOD_CONTROL = 0x0002
+MOD_SHIFT = 0x0004
+MOD_WIN = 0x0008
 
-    Usage:
-        KeybindManager.initialize()  # to attach the 'SET' listeners for known keybind settings
-        KeybindManager.bindKey("PICK_KEYBIND", someCallbackFunction)
-        KeybindManager.unbindKey("PICK_KEYBIND", someCallbackFunction)
-    """
+VIRTUAL_KEY_CODES = {
+    'f1': 0x70, 'f2': 0x71, 'f3': 0x72, 'f4': 0x73,
+    'f5': 0x74, 'f6': 0x75, 'f7': 0x76, 'f8': 0x77,
+    'f9': 0x78, 'f10': 0x79, 'f11': 0x7A, 'f12': 0x7B,
+    'a': 0x41, 'b': 0x42, 'c': 0x43, 'd': 0x44, 'e': 0x45,
+    'f': 0x46, 'g': 0x47, 'h': 0x48, 'i': 0x49, 'j': 0x4A,
+    'k': 0x4B, 'l': 0x4C, 'm': 0x4D, 'n': 0x4E, 'o': 0x4F,
+    'p': 0x50, 'q': 0x51, 'r': 0x52, 's': 0x53, 't': 0x54,
+    'u': 0x55, 'v': 0x56, 'w': 0x57, 'x': 0x58, 'y': 0x59,
+    'z': 0x5A, 'space': 0x20, 'enter': 0x0D, 'esc': 0x1B,
+    'tab': 0x09, 'backspace': 0x08, 'delete': 0x2E,
+    'insert': 0x2D, 'home': 0x24, 'end': 0x23, 
+    'pageup': 0x21, 'pagedown': 0x22, 'left': 0x25,
+    'right': 0x27, 'up': 0x26, 'down': 0x28, '`': 0xC0
+}
 
+class HotkeyHandler(QWidget):
+    hotkey_triggered = Signal(int)
+
+    def __init__(self):
+        super().__init__()
+        self.hotkeys = {}
+        self.next_id = 1
+
+    def register_hotkey(self, vk, modifiers):
+        hotkey_id = self.next_id
+        self.next_id += 1
+        hwnd = self.winId()
+        if ctypes.windll.user32.RegisterHotKey(hwnd, hotkey_id, modifiers, vk):
+            self.hotkeys[hotkey_id] = (vk, modifiers)
+            return hotkey_id
+        return None
+
+    def unregister_hotkey(self, hotkey_id):
+        if hotkey_id in self.hotkeys:
+            hwnd = self.winId()
+            ctypes.windll.user32.UnregisterHotKey(hwnd, hotkey_id)
+            del self.hotkeys[hotkey_id]
+    
+    def nativeEvent(self, event_type, message):
+        msg = ctypes.wintypes.MSG.from_address(message.__int__())
+        
+        if msg.message == WM_HOTKEY:
+            hotkey_id = msg.wParam
+           
+            self.hotkey_triggered.emit(hotkey_id)
+            return True, 0  # Event handled
+        return super().nativeEvent(event_type, message)
+
+class KeybindManager(QWidget):
     KEYBIND_KEYS = ["PICK_KEYBIND", "TOGGLE_KEYBIND", "HISTORY_KEYBIND"]
 
-    _boundKeybinds = {}
-
-    #QObject that acts as the parent for shortcut objects
-    _parent = None
+    def __init__(self):
+        super().__init__()
+        self.handler = HotkeyHandler()
+        self.bound_keybinds = {}
+        self.id_map = {}
+        self.handler.hotkey_triggered.connect(self.handle_hotkey)
 
     @classmethod
     def initialize(cls, parent):
-        """
-        Initialize the KeybindManager by reading current hotkeys from Settings
-        and setting up listeners for any changes to those hotkeys.
-        """
-        _parent = parent
+        instance = cls()
         for key in cls.KEYBIND_KEYS:
             try:
-                currentValue = Settings.get(key)  # e.g., "f2", "f3", etc.
-                cls._boundKeybinds[key] = {
-                    "currentHotkey": currentValue,
-                    "callbacks": {}
+                current = Settings.get(key)
+                instance.bound_keybinds[key] = {
+                    'current': current,
+                    'callbacks': set(),
+                    'hk_id': None,
+                    'vk': None,
+                    'mods': None
                 }
-                # Add a listener to handle changes to this hotkey setting
-                Settings.addListener("SET", key, lambda newVal, k=key: cls._onSettingChanged(k, newVal))
+                Settings.addListener("SET", key, 
+                    lambda v, k=key: instance.update_binding(k, v))
             except Exception as e:
-                print(f"Error initializing keybind for '{key}': {e}")
-                # Reset to default if there's an issue
+                print(f"Keybind init error: {e}")
                 Settings.reset(key)
+        return instance
 
-    @classmethod
-    def bindKey(cls, settingsKey, callback):
-        """
-        Bind a callback function to the current hotkey associated with `settingsKey`.
+    def parse_hotkey(self, hotkey_str):
+        modifiers = 0
+        parts = hotkey_str.lower().split('+')
+        for part in parts[:-1]:
+            match part:
+                case 'ctrl': modifiers |= MOD_CONTROL
+                case 'alt': modifiers |= MOD_ALT
+                case 'shift': modifiers |= MOD_SHIFT
+                case 'win': modifiers |= MOD_WIN
+                case _: raise ValueError(f"Invalid modifier: {part}")
+        
+        vk_str = parts[-1]
+        vk = VIRTUAL_KEY_CODES.get(vk_str)
+        if not vk: raise ValueError(f"Invalid key: {vk_str}")
+        return vk, modifiers
 
-        :param settingsKey: A valid key in Settings (e.g., "PICK_KEYBIND").
-        :param callback:    The function to call when the hotkey is pressed.
-        """
-        cls._validateSettingsKey(settingsKey)
-
-        # Get the current hotkey from Settings
-        try:
-            hotkey = Settings.get(settingsKey)
-        except KeyError as e:
-            print(f"Failed to get hotkey for '{settingsKey}': {e}")
+    def update_binding(self, key, new_hotkey):
+        bind = self.bound_keybinds[key]
+        if bind['current'] == new_hotkey:
             return
 
-        # Initialize the boundKeybinds entry if not present
-        if settingsKey not in cls._boundKeybinds:
-            cls._boundKeybinds[settingsKey] = {
-                "currentHotkey": hotkey,
-                "callbacks": {}
-            }
+        old_hk = bind['current']
+        bind['current'] = new_hotkey
+        
+        if bind['hk_id'] is not None:
+            self.unregister_binding(key)
+            if bind['callbacks']:
+                self.register_binding(key)
 
-        record = cls._boundKeybinds[settingsKey]
-
-        # If the hotkey has changed outside of this method, rebind existing callbacks
-        if record["currentHotkey"] != hotkey:
-            cls._rebind(settingsKey, record["currentHotkey"], hotkey)
-
-        # Attempt to bind the new callback
+    def register_binding(self, key):
         try:
-            handle = keyboard.add_hotkey(hotkey, callback)
-            record["callbacks"][callback] = handle
+            bind = self.bound_keybinds[key]
+            vk, mods = self.parse_hotkey(bind['current'])
+            hk_id = self.handler.register_hotkey(vk, mods)
+            if not hk_id: raise Exception("Registration failed")
+            
+            bind['vk'] = vk
+            bind['mods'] = mods
+            bind['hk_id'] = hk_id
+            self.id_map[hk_id] = key
         except Exception as e:
-            print(f"Failed to bind key '{hotkey}' for '{settingsKey}': {e}")
-            # Reset to default if binding fails
-            Settings.reset(settingsKey)
+            print(f"Failed to register {key}: {e}")
+            Settings.reset(key)
 
-    @classmethod
-    def unbindKey(cls, settingsKey, callback):
-        """
-        Unbind a previously bound callback from the hotkey associated with `settingsKey`.
+    def unregister_binding(self, key):
+        bind = self.bound_keybinds[key]
+        if bind['hk_id']:
+            self.handler.unregister_hotkey(bind['hk_id'])
+            del self.id_map[bind['hk_id']]
+            bind['hk_id'] = None
 
-        :param settingsKey: A valid key in Settings (e.g., "PICK_KEYBIND").
-        :param callback:    The function that was originally bound.
-        """
-        cls._validateSettingsKey(settingsKey)
+    def bindKey(self, key, callback):
+        self._validate_key(key)
+        bind = self.bound_keybinds[key]
+        bind['callbacks'].add(callback)
+        
+        if not bind['hk_id']:
+            self.register_binding(key)
 
-        if settingsKey not in cls._boundKeybinds:
-            print(f"No bindings found for '{settingsKey}'.")
-            return  # No bindings to remove
+    def unbindKey(self, key, callback):
+        self._validate_key(key)
+        bind = self.bound_keybinds[key]
+        if callback in bind['callbacks']:
+            bind['callbacks'].remove(callback)
+            if not bind['callbacks']:
+                self.unregister_binding(key)
 
-        callbacksDict = cls._boundKeybinds[settingsKey]["callbacks"]
-        if callback not in callbacksDict:
-            print(f"Callback '{callback.__name__}' not bound to '{settingsKey}'.")
-            return  # Callback not found
+    def handle_hotkey(self, hk_id):
+        key = self.id_map.get(hk_id)
+        if not key: return
+        
+        for callback in self.bound_keybinds[key]['callbacks']:
+            try: callback()
+            except Exception as e: print(f"Callback error: {e}")
 
-        # Remove the hotkey from the keyboard module
-        handle = callbacksDict[callback]
-        try:
-            keyboard.remove_hotkey(handle)
-        except Exception as e:
-            print(f"Failed to unbind key for '{settingsKey}': {e}")
-
-        # Remove the callback from the internal dictionary
-        del callbacksDict[callback]
-
-    @classmethod
-    def _onSettingChanged(cls, settingsKey, newValue):
-        """
-        Triggered whenever a 'SET' action occurs on one of the known hotkey settings.
-        This will rebind any existing callbacks to the new hotkey.
-        """
-        if settingsKey not in cls._boundKeybinds:
-            return
-
-        record = cls._boundKeybinds[settingsKey]
-        oldHotkey = record["currentHotkey"]
-
-        if oldHotkey == newValue:
-            return  # No change
-
-        cls._rebind(settingsKey, oldHotkey, newValue)
-
-    @classmethod
-    def _rebind(cls, settingsKey, oldHotkey, newHotkey):
-        """
-        Rebind all callbacks that were previously bound to oldHotkey onto newHotkey.
-        If rebinding fails, reset the keybind to its default value.
-
-        :param settingsKey: The settings key being rebound.
-        :param oldHotkey:   The old hotkey string.
-        :param newHotkey:   The new hotkey string.
-        """
-        record = cls._boundKeybinds[settingsKey]
-        callbacksDict = record["callbacks"]
-
-        # Store the callbacks to rebind
-        callbacks = list(callbacksDict.keys())
-
-        # Remove all existing hotkey bindings
-        for cb, handle in callbacksDict.items():
-            try:
-                keyboard.remove_hotkey(handle)
-            except Exception as e:
-                print(f"Failed to remove old hotkey '{oldHotkey}' for '{settingsKey}': {e}")
-
-        # Clear the current handles
-        record["callbacks"] = {}
-
-        # Attempt to rebind each callback to the new hotkey
-        for cb in callbacks:
-            try:
-                handle = keyboard.add_hotkey(newHotkey, cb)
-                record["callbacks"][cb] = handle
-            except Exception as e:
-                print(f"Failed to bind new hotkey '{newHotkey}' for '{settingsKey}': {e}")
-                # If rebinding fails, reset to default
-                Settings.reset(settingsKey)
-                break  # Exit early since the new hotkey is invalid
-
-        # Update the current hotkey if all bindings succeeded
-        if settingsKey in cls._boundKeybinds:
-            record["currentHotkey"] = newHotkey
-
-    @classmethod
-    def _validateSettingsKey(cls, settingsKey):
-        """
-        Ensure that the given key is in the Settings dictionary and is also recognized
-        as a valid hotkey. Otherwise, raise an error.
-
-        :param settingsKey: The key to validate.
-        """
-        # Check if key exists in Settings
-        try:
-            Settings.get(settingsKey)
-        except KeyError:
-            raise KeyError(f"'{settingsKey}' is not a valid setting key in Settings.")
-
-        # Ensure it's one of the recognized hotkey settings
-        if settingsKey not in cls.KEYBIND_KEYS:
-            raise ValueError(
-                f"'{settingsKey}' is not recognized as a hotkey setting. "
-                f"Valid keybind settings are: {cls.KEYBIND_KEYS}"
-            )
+    def _validate_key(self, key):
+        if key not in self.KEYBIND_KEYS:
+            raise ValueError(f"Invalid keybind key: {key}")

@@ -7,6 +7,7 @@ from dialogs import TransparentOverlay
 from widgets import ColorPicker
 from menus import SettingsMenu
 import styles
+import sys
 
 class App(QMainWindow):
     # Constants
@@ -21,7 +22,7 @@ class App(QMainWindow):
     def __init__(self):
         super().__init__()
         Settings.load()
-        KeybindManager.initialize(self)
+        self.keybindManager = KeybindManager.initialize(self)
         self.colorPicker = None
         self.overlay = None
         self.pickerToggled = False
@@ -53,9 +54,9 @@ class App(QMainWindow):
 
     def setupHotkeys(self):
         """Setup keyboard shortcuts"""
-        KeybindManager.bindKey("PICK_KEYBIND", lambda: self.initiateOverlaySignal.emit())
-        KeybindManager.bindKey("TOGGLE_KEYBIND", lambda: self.toggleColorPickerSignal.emit())
-        KeybindManager.bindKey("HISTORY_KEYBIND", lambda: self.toggleHistoryWidgetSignal.emit())
+        self.keybindManager.bindKey("PICK_KEYBIND", lambda: self.initiateOverlaySignal.emit())
+        self.keybindManager.bindKey("TOGGLE_KEYBIND", lambda: self.toggleColorPickerSignal.emit())
+        self.keybindManager.bindKey("HISTORY_KEYBIND", lambda: self.toggleHistoryWidgetSignal.emit())
 
     def setupTrayMenu(self):
         """Set up the system tray menu using the consolidated SettingsMenu."""
@@ -120,3 +121,9 @@ class App(QMainWindow):
         self.trayIcon.hide()
         Settings.save()
         QApplication.quit()
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)    
+    ex = App()
+    sys.exit(app.exec())
