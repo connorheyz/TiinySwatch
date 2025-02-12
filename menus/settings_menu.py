@@ -111,12 +111,6 @@ class SettingsMenu(QMenu):
         self.formatActionGroup.addAction(self.cmykAction)
         self.addAction(self.cmykAction)
 
-        # LAB Action
-        self.labAction = QAction("LAB", self, checkable=True)
-        self.labAction.triggered.connect(lambda checked: self.onFormatSelected("LAB") if checked else None)
-        self.formatActionGroup.addAction(self.labAction)
-        self.addAction(self.labAction)
-
     def initExitAction(self):
         """
         Create and add the 'Exit' action at the bottom of the menu.
@@ -171,8 +165,6 @@ class SettingsMenu(QMenu):
             self.hslAction.setChecked(True)
         elif currentFormat == "CMYK":
             self.cmykAction.setChecked(True)
-        elif currentFormat == "LAB":
-            self.labAction.setChecked(True)
 
     def updateColorActions(self, _):
         """
@@ -189,11 +181,9 @@ class SettingsMenu(QMenu):
         hsvText = ClipboardManager.getTemplate("HSV")(color) + " (hsv)"
         hslText = ClipboardManager.getTemplate("HSL")(color) + " (hsl)"
         cmykText = ClipboardManager.getTemplate("CMYK")(color) + " (cmyk)"
-        labText = ClipboardManager.getTemplate("LAB")(color) + " (lab)"
 
         self.rgbAction.setText(rgbText)
         self.hexAction.setText(hexText)
         self.hsvAction.setText(hsvText)
         self.hslAction.setText(hslText)
         self.cmykAction.setText(cmykText)
-        self.labAction.setText(labText)

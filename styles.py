@@ -4,14 +4,14 @@ QWidget {
     color: #DDD;
 }
 
-QSpinBox {
+QSpinBox, QDoubleSpinBox {
     background-color: #555;
     border: 1px solid #666;
-    width: 30px;
+    width: 40px;
     height: 1.5em;
 }
 
-QSpinBox::up-button, QSpinBox::down-button {
+QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
     background-color: #444;
     color: white;
     padding: 5px;

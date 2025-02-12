@@ -111,3 +111,4 @@ class TransparentOverlay(QDialog):
     def closeEvent(self, event):
         QApplication.restoreOverrideCursor()
         self.parent.overlay = None
+        self.parent.overlayToggled = False

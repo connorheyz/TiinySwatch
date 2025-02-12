@@ -5,7 +5,7 @@ from colormath.color_objects import (
     XYZColor, xyYColor, LuvColor,
     AdobeRGBColor
 )
-
+from .pantone_data import PantoneData
 
 class QColorEnhanced:
     """
@@ -13,9 +13,9 @@ class QColorEnhanced:
     editable color values in multiple color spaces (Lab, XYZ, xyY, Luv, AdobeRGB),
     using a "dirty flag" approach for each space:
     
-    - If a color space is dirty, we re-derive it from the underlying QColor (sRGB)
+    - If a color space is dirty, we re-derive it from the underlying QColor (via XYZ)
       when needed.
-    - If you set a color space, we convert it to sRGB immediately and update QColor.
+    - If you set a color space, we convert it to XYZ immediately, then to sRGB to update QColor.
       We do *not* re-derive that space from QColor, so incremental changes won't
       round-trip away.
     - All other color spaces are marked dirty whenever one space is set.
@@ -24,119 +24,87 @@ class QColorEnhanced:
     def __init__(self, qcolor: QColor):
         self.qcolor = qcolor
 
-        # A dictionary containing our supported color spaces.
-        # Each entry defines:
-        #   - 'components': dict of component names/values
-        #   - 'dirty': bool
-        #   - 'to_srgb': func(components_dict) -> sRGBColor
-        #   - 'from_srgb': func(srgb: sRGBColor) -> dict of new components
-        #
-        # If a space has special parameters like observer/illuminant or is_upscaled,
-        # store them here so they're used properly in conversion. 
         self._color_spaces = {
             'lab': {
                 'components': {'L': 0.0, 'a': 0.0, 'b': 0.0},
                 'dirty': True,
                 'observer': '2',
                 'illuminant': 'd50',
-                'to_srgb': self._lab_to_srgb,
-                'from_srgb': self._srgb_to_lab,
+                'to_xyz': self._lab_to_xyz,
+                'from_xyz': self._xyz_to_lab,
             },
             'xyz': {
                 'components': {'x': 0.0, 'y': 0.0, 'z': 0.0},
                 'dirty': True,
                 'observer': '2',
                 'illuminant': 'd50',
-                'to_srgb': self._xyz_to_srgb,
-                'from_srgb': self._srgb_to_xyz,
+                'to_xyz': self._xyz_to_xyz,
+                'from_xyz': self._xyz_from_xyz,
             },
             'xyy': {
                 'components': {'x': 0.0, 'y': 0.0, 'Y': 0.0},
                 'dirty': True,
                 'observer': '2',
                 'illuminant': 'd50',
-                'to_srgb': self._xyy_to_srgb,
-                'from_srgb': self._srgb_to_xyy,
+                'to_xyz': self._xyy_to_xyz,
+                'from_xyz': self._xyz_to_xyy,
             },
             'luv': {
                 'components': {'L': 0.0, 'u': 0.0, 'v': 0.0},
                 'dirty': True,
                 'observer': '2',
                 'illuminant': 'd50',
-                'to_srgb': self._luv_to_srgb,
-                'from_srgb': self._srgb_to_luv,
+                'to_xyz': self._luv_to_xyz,
+                'from_xyz': self._xyz_to_luv,
             },
             'adobe_rgb': {
                 'components': {'r': 0.0, 'g': 0.0, 'b': 0.0},
                 'dirty': True,
-                'is_upscaled': False,  # default
-                'to_srgb': self._adobe_to_srgb,
-                'from_srgb': self._srgb_to_adobe,
+                'is_upscaled': False,
+                'to_xyz': self._adobe_to_xyz,
+                'from_xyz': self._xyz_to_adobe,
             },
         }
 
     # -----------------------------------------------------------
-    # Internal conversion helpers to/from sRGB
+    # Internal conversion helpers to/from XYZ
     # -----------------------------------------------------------
 
-    def _lab_to_srgb(self, comps):
-        """
-        Convert stored Lab -> sRGB using colormath.
-        """
-        # You can override observer/illuminant if you like; using stored values here.
-        cspace = LabColor(
+    def _lab_to_xyz(self, comps):
+        lab_color = LabColor(
             lab_l=comps['L'],
             lab_a=comps['a'],
             lab_b=comps['b'],
             observer=self._color_spaces['lab']['observer'],
             illuminant=self._color_spaces['lab']['illuminant']
         )
-        return convert_color(cspace, sRGBColor)
+        return convert_color(lab_color, XYZColor)
 
-    def _srgb_to_lab(self, srgb):
-        """
-        Convert from sRGB -> Lab. Return dict of {L, a, b}.
-        """
-        # Same observer/illuminant usage
-        lab_obj = convert_color(srgb,LabColor)
-
+    def _xyz_to_lab(self, xyz_color):
+        lab_color = convert_color(xyz_color, LabColor)
         return {
-            'L': lab_obj.lab_l,
-            'a': lab_obj.lab_a,
-            'b': lab_obj.lab_b
+            'L': lab_color.lab_l,
+            'a': lab_color.lab_a,
+            'b': lab_color.lab_b
         }
 
-    def _xyz_to_srgb(self, comps):
-        """
-        Convert stored XYZ -> sRGB.
-        """
-        cspace = XYZColor(
+    def _xyz_to_xyz(self, comps):
+        return XYZColor(
             xyz_x=comps['x'],
             xyz_y=comps['y'],
             xyz_z=comps['z'],
             observer=self._color_spaces['xyz']['observer'],
             illuminant=self._color_spaces['xyz']['illuminant']
         )
-        return convert_color(cspace, sRGBColor)
 
-    def _srgb_to_xyz(self, srgb):
-        """
-        Convert sRGB -> XYZ.
-        """
-        xyz_obj = convert_color(
-            srgb,
-            XYZColor
-        )
+    def _xyz_from_xyz(self, xyz_color):
         return {
-            'x': xyz_obj.xyz_x,
-            'y': xyz_obj.xyz_y,
-            'z': xyz_obj.xyz_z
+            'x': xyz_color.xyz_x,
+            'y': xyz_color.xyz_y,
+            'z': xyz_color.xyz_z
         }
 
-    def _xyy_to_srgb(self, comps):
-        """
-        Convert xyY -> sRGB.
-        """
+    def _xyy_to_xyz(self, comps):
         cspace = xyYColor(
             xyy_x=comps['x'],
             xyy_y=comps['y'],
@@ -144,26 +112,17 @@ class QColorEnhanced:
             observer=self._color_spaces['xyy']['observer'],
             illuminant=self._color_spaces['xyy']['illuminant']
         )
-        return convert_color(cspace, sRGBColor)
+        return convert_color(cspace, XYZColor)
 
-    def _srgb_to_xyy(self, srgb):
-        """
-        Convert sRGB -> xyY.
-        """
-        xyy_obj = convert_color(
-            srgb,
-            xyYColor
-        )
+    def _xyz_to_xyy(self, xyz_color):
+        xyy_obj = convert_color(xyz_color, xyYColor)
         return {
             'x': xyy_obj.xyy_x,
             'y': xyy_obj.xyy_y,
             'Y': xyy_obj.xyy_Y
         }
 
-    def _luv_to_srgb(self, comps):
-        """
-        Convert Luv -> sRGB.
-        """
+    def _luv_to_xyz(self, comps):
         cspace = LuvColor(
             luv_l=comps['L'],
             luv_u=comps['u'],
@@ -171,103 +130,74 @@ class QColorEnhanced:
             observer=self._color_spaces['luv']['observer'],
             illuminant=self._color_spaces['luv']['illuminant']
         )
-        return convert_color(cspace, sRGBColor)
+        return convert_color(cspace, XYZColor)
 
-    def _srgb_to_luv(self, srgb):
-        """
-        Convert sRGB -> Luv.
-        """
-        luv_obj = convert_color(
-            srgb,
-            LuvColor
-        )
+    def _xyz_to_luv(self, xyz_color):
+        luv_obj = convert_color(xyz_color, LuvColor)
         return {
             'L': luv_obj.luv_l,
             'u': luv_obj.luv_u,
             'v': luv_obj.luv_v
         }
 
-    def _adobe_to_srgb(self, comps):
-        """
-        Convert AdobeRGB -> sRGB.
-        """
-        # Note that AdobeRGBColor has an is_upscaled flag that indicates whether
-        # r, g, b are in [0..1] or [0..255]. Here, we store them as [0..1], so we typically
-        # won't need upscaling. If you want [0..255], just adapt as needed.
-        cspace = AdobeRGBColor(
-            rgb_r=comps['r'],
-            rgb_g=comps['g'],
-            rgb_b=comps['b'],
+    def _adobe_to_xyz(self, comps):
+        adobe = AdobeRGBColor(
+            comps['r'], comps['g'], comps['b'], 
             is_upscaled=self._color_spaces['adobe_rgb']['is_upscaled']
         )
-        return convert_color(cspace, sRGBColor)
+        return convert_color(adobe, XYZColor)
 
-    def _srgb_to_adobe(self, srgb):
-        """
-        Convert sRGB -> AdobeRGB.
-        """
-        adobe_obj = convert_color(
-            srgb,
-            AdobeRGBColor,
-        )
+    def _xyz_to_adobe(self, xyz_color):
+        adobe = convert_color(xyz_color, AdobeRGBColor)
         return {
-            'r': adobe_obj.rgb_r,
-            'g': adobe_obj.rgb_g,
-            'b': adobe_obj.rgb_b
+            'r': adobe.rgb_r,
+            'g': adobe.rgb_g,
+            'b': adobe.rgb_b
         }
+
+    def _srgb_to_xyz(self, srgb):
+        return convert_color(srgb, XYZColor)
+
+    def _xyz_to_srgb(self, xyz_color):
+        return convert_color(xyz_color, sRGBColor)
 
     # -----------------------------------------------------------
     # Dirty / sync logic
     # -----------------------------------------------------------
 
     def _mark_others_dirty(self, except_space):
-        """
-        Mark all color spaces dirty except the given one.
-        """
         for space_name, space_data in self._color_spaces.items():
             if space_name != except_space:
                 space_data['dirty'] = True
 
     def _syncQColorFromSpace(self, space_name):
-        """
-        Convert the stored components in `space_name` -> sRGB,
-        update self.qcolor (clamped to 0..255),
-        and mark all other color spaces dirty.
-        """
         space_data = self._color_spaces[space_name]
-        srgb = space_data['to_srgb'](space_data['components'])
+        xyz = space_data['to_xyz'](space_data['components'])
+        srgb = self._xyz_to_srgb(xyz)
 
-        # Convert to 0..255 and clamp
         r = max(min(int(round(srgb.rgb_r * 255)), 255), 0)
         g = max(min(int(round(srgb.rgb_g * 255)), 255), 0)
         b = max(min(int(round(srgb.rgb_b * 255)), 255), 0)
 
         self.qcolor.setRgb(r, g, b)
-        # This space is not dirty since it's the source of truth
         space_data['dirty'] = False
-
-        # All other spaces become dirty
         self._mark_others_dirty(space_name)
 
     def _ensureSpaceInSync(self, space_name):
-        """
-        If the space is dirty, re-derive it from self.qcolor (treated as sRGB).
-        """
         space_data = self._color_spaces[space_name]
         if space_data['dirty']:
             r = self.qcolor.red()
             g = self.qcolor.green()
             b = self.qcolor.blue()
-            # Scale 0..255 -> 0..1
-            srgb = sRGBColor(r / 255.0, g / 255.0, b / 255.0)
-            new_comps = space_data['from_srgb'](srgb)
+            srgb_color = sRGBColor(r / 255.0, g / 255.0, b / 255.0)
+            xyz_color = self._srgb_to_xyz(srgb_color)
+            new_comps = space_data['from_xyz'](xyz_color)
             space_data['components'].update(new_comps)
             space_data['dirty'] = False
 
     # -----------------------------------------------------------
     # Lab getters and setters
     # -----------------------------------------------------------
-    # (Preserve your existing interface, just route through the new dict.)
 
     def getLab(self):
         self._ensureSpaceInSync('lab')
@@ -275,16 +205,14 @@ class QColorEnhanced:
 
     def setLab(self, L=None, a=None, b=None):
         lab_data = self._color_spaces['lab']['components']
-        lab_data['L'] = L or lab_data['L']
-        lab_data['a'] = a or lab_data['a']
-        lab_data['b'] = b or lab_data['b']
-
+        lab_data['L'] = L if L is not None else lab_data['L']
+        lab_data['a'] = a if a is not None else lab_data['a']
+        lab_data['b'] = b if b is not None else lab_data['b']
         self._syncQColorFromSpace('lab')
 
     # -----------------------------------------------------------
     # XYZ getters and setters
     # -----------------------------------------------------------
-
     def getXYZ(self):
         self._ensureSpaceInSync('xyz')
         return self._color_spaces['xyz']['components']
@@ -341,15 +269,34 @@ class QColorEnhanced:
         adobe_data['b'] = b if b is not None else adobe_data['b']
         self._syncQColorFromSpace('adobe_rgb')
 
-    # If you need to toggle is_upscaled for Adobe, you can add a setter here:
     def setAdobeUpscaled(self, flag: bool):
         self._color_spaces['adobe_rgb']['is_upscaled'] = flag
         # Mark dirty so next read from AdobeRGB reconverts from sRGB with new scaling
         self._color_spaces['adobe_rgb']['dirty'] = True
 
     # -----------------------------------------------------------
+    # Pantone getters and setters
+    # -----------------------------------------------------------
+    def getPantone(self):
+        """
+        Finds and returns the name of the closest Pantone color based on Lab distance.
+        """
+        self._ensureSpaceInSync('lab')
+        current_lab = self.getLab()
+        l, a, b = current_lab['L'], current_lab['a'], current_lab['b']
+        
+        pantone_data = PantoneData()
+        closest_name = pantone_data.find_closest(l, a, b)
+
+        return closest_name
+
+    def setPantone(self, name):
+        pantone_data = PantoneData()
+        lab_value = pantone_data.get_lab(name)
+        if lab_value:
+            self.setLab(lab_value[0], lab_value[1], lab_value[2])
+    # -----------------------------------------------------------
     # Wrapped QColor getters and setters
-    # (same as before)
     # -----------------------------------------------------------
 
     def red(self):

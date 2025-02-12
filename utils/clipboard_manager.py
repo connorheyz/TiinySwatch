@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QApplication
 from utils import Settings
+from .color_utils import QColorEnhanced
 
 class ClipboardManager:
 
@@ -41,15 +42,30 @@ class ClipboardManager:
             raise ValueError(f"Unsupported format type '{format_type}' or key '{key}'.")
 
     @classmethod
+    def getFormattedColor(cls, color):
+        if not isinstance(color, QColorEnhanced):
+            color = QColorEnhanced(color)
+        format_type = Settings.get("FORMAT")
+        
+        # Retrieve the appropriate template using the getTemplate method
+        template = cls.getTemplate(format_type)
+        return template(color)
+    
+    @classmethod
+    def copySelectedColorsToClipboard(cls):
+        clipboard = QApplication.clipboard()
+        selected_colors = Settings.get("selectedColors")
+
+        clipboard_strings = [cls.getFormattedColor(color) for color in selected_colors]
+
+        clipboard.setText("\n".join(clipboard_strings))
+
+    @classmethod
     def copyCurrentColorToClipboard(cls):
         """Copy the current color to clipboard in the selected format."""
         clipboard = QApplication.clipboard()
         current_color = Settings.get("currentColor")
-        format_type = Settings.get("FORMAT")
         
-
-        # Retrieve the appropriate template using the getTemplate method
-        template = cls.getTemplate(format_type)
-        formatted_color = template(current_color)
+        formatted_color = cls.getFormattedColor(current_color)
 
         clipboard.setText(formatted_color)

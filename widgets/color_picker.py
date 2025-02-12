@@ -1,15 +1,16 @@
 from functools import partial
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QLabel, QSlider, QSpinBox, QFrame,
+    QApplication, QLabel, QSlider, QSpinBox, QDoubleSpinBox, QFrame,
     QHBoxLayout, QPushButton, QVBoxLayout, QWidget, QLineEdit, QMenu, QSizePolicy
 )
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QCursor
 from PySide6 import QtCore
 
 import styles
-from utils import Settings, ClipboardManager, QColorEnhanced
+from utils import Settings, ClipboardManager, QColorEnhanced, PantoneData
 from widgets import HistoryPalette
+from .q_double_slider import QDoubleSlider
 
 class ColorPicker(QWidget):
     # Window flags
@@ -27,9 +28,6 @@ class ColorPicker(QWidget):
     """
 
     CHANNEL_INFO = {
-        # -------------------------------------------------------------
-        # Existing channels (HSV, HSL, RGB, CMYK, Lab) as before...
-        # -------------------------------------------------------------
         "HSVHue": {
             "actualRange": (0, 359),
             "sliderRange": (0, 359),
@@ -70,7 +68,7 @@ class ColorPicker(QWidget):
             "sliderRange": (0, 255),
             "steps": 10,
             "get": lambda c: c.lightness(),
-            "set": lambda c, v: c.setHsl(c.hslHue(), c.hslSaturation(), v, c.alpha())
+            "set": lambda c, v: c.setHsl(c.hslHue(), c.hslSaturation(), v, c.alpha()),
         },
         "Red": {
             "actualRange": (0, 255),
@@ -126,47 +124,49 @@ class ColorPicker(QWidget):
             "sliderRange": (0, 100),
             "steps": 10,
             "get": lambda c: c.getLab()['L'],
-            "set": lambda c, v: c.setLab(L=v)
+            "set": lambda c, v: c.setLab(L=v),
+            "round": False
         },
         "LABA": {
             "actualRange": (-128, 127),
             "sliderRange": (-128, 127),
             "steps": 10,
             "get": lambda c: c.getLab()['a'],
-            "set": lambda c, v: c.setLab(a=v)
+            "set": lambda c, v: c.setLab(a=v),
+            "round": False
         },
         "LABB": {
             "actualRange": (-128, 127),
             "sliderRange": (-128, 127),
             "steps": 10,
             "get": lambda c: c.getLab()['b'],
-            "set": lambda c, v: c.setLab(b=v)
+            "set": lambda c, v: c.setLab(b=v),
+            "round": False
         },
-
-        # -------------------------------------------------------------
-        # NEW CHANNELS: XYZ, xyY, Luv, AdobeRGB
-        # -------------------------------------------------------------
         "XYZX": {
             # Often X, Y, Z are in 0..1 or 0..100. Choose 0..100 for a bigger editing range
             "actualRange": (0, 1.0),
             "sliderRange": (0, 100),
             "steps": 10,
             "get": lambda c: c.getXYZ()['x'],
-            "set": lambda c, v: c.setXYZ(x=v)
+            "set": lambda c, v: c.setXYZ(x=v),
+            "round": False
         },
         "XYZY": {
             "actualRange": (0, 1.0),
             "sliderRange": (0, 100),
             "steps": 10,
             "get": lambda c: c.getXYZ()['y'],
-            "set": lambda c, v: c.setXYZ(y=v)
+            "set": lambda c, v: c.setXYZ(y=v),
+            "round": False
         },
         "XYZZ": {
             "actualRange": (0, 1.0),
             "sliderRange": (0, 100),
             "steps": 10,
             "get": lambda c: c.getXYZ()['z'],
-            "set": lambda c, v: c.setXYZ(z=v)
+            "set": lambda c, v: c.setXYZ(z=v),
+            "round": False
         },
         "LuvL": {
             # L in [0..100], while u,v can be roughly [-100..100]
@@ -190,20 +190,76 @@ class ColorPicker(QWidget):
             "get": lambda c: c.getLuv()['v'],
             "set": lambda c, v: c.setLuv(v=v)
         },
+        "AdobeRed": {
+            "actualRange": (0, 1.0),
+            "sliderRange": (0, 1.0),
+            "steps": 10,
+            "get": lambda c: c.getAdobeRGB()['r'],
+            "set": lambda c, v: c.setAdobeRGB(r=v),
+            "round": False
+        },
+        "AdobeBlue": {
+            "actualRange": (0, 1.0),
+            "sliderRange": (0, 1.0),
+            "steps": 10,
+            "get": lambda c: c.getAdobeRGB()['b'],
+            "set": lambda c, v: c.setAdobeRGB(b=v),
+            "round": False
+        },
+        "AdobeGreen": {
+            "actualRange": (0, 1.0),
+            "sliderRange": (0, 1.0),
+            "steps": 10,
+            "get": lambda c: c.getAdobeRGB()['g'],
+            "set": lambda c, v: c.setAdobeRGB(g=v),
+            "round": False
+        },
+        "xyYx": {
+            "actualRange": (0, 1.0),
+            "sliderRange": (0, 1.0),
+            "steps": 10,
+            "get": lambda c: c.getxyY()['x'],
+            "set": lambda c, v: c.setxyY(x=v),
+            "round": False,
+        },
+        "xyYy": {
+            "actualRange": (0, 1.0),
+            "sliderRange": (0, 1.0),
+            "steps": 10,
+            "get": lambda c: c.getxyY()['y'],
+            "set": lambda c, v: c.setxyY(y=v),
+            "round": False
+        },
+        "xyYY": {
+            "actualRange": (0, 1.0),
+            "sliderRange": (0, 100),
+            "steps": 10,
+            "get": lambda c: c.getxyY()['Y'],
+            "set": lambda c, v: c.setxyY(Y=v),
+            "round": False
+        },
+        "PantoneColor": {
+            "get": lambda c: c.getPantone(),
+            "set": lambda c, v: c.setPantone(v),
+            "actualRange": (0, 1),  # Dummy values, not used
+            "sliderRange": (0, 1),  # Dummy values, not used
+            "steps": 1
+        },
     }
 
     # ------------------------------------------------------------------------
     # Format definitions: which channels appear in which "format"
     # ------------------------------------------------------------------------
     FORMAT_CHANNELS = {
+        "sRGB":  ["Red", "Green", "Blue"],
         "HSV":  ["HSVHue", "HSVSaturation", "Value"],
         "HSL":  ["HSLHue", "HSLSaturation", "HSLLightness"],
-        "RGB":  ["Red", "Green", "Blue"],
         "CMYK": ["Cyan", "Magenta", "Yellow", "Key"],
+        "AdobeRGB": ["AdobeRed", "AdobeGreen", "AdobeBlue"],
+        "Pantone": ["PantoneColor"],
         "LAB":  ["LABLightness", "LABA", "LABB"],
-
-        # New color models
-        "XYZ":   ["XYZX", "XYZY", "XYZZ"],
+        "XYZ":  ["XYZX", "XYZY", "XYZZ"],
+        "xyY":  ["xyYx", "xyYy", "xyYY"]
     }
 
 
@@ -292,20 +348,16 @@ class ColorPicker(QWidget):
         mainLayout = QVBoxLayout(self)
         mainLayout.setContentsMargins(0, 0, 0, 0)
 
-        # 1) Header
         headerWidget = self.createHeaderWidget()
         mainLayout.addWidget(headerWidget)
 
-        # 2) Color preview & controls container
         self.controlsLayout = QVBoxLayout()
         self.controlsLayout.setContentsMargins(10, 10, 10, 10)
 
-        # 2A) Color preview
         self.colorPreview = QPushButton(objectName="ColorPreview")
-        self.colorPreview.setFixedSize(230, 50)
+        self.colorPreview.setFixedSize(275, 50)
         self.controlsLayout.addWidget(self.colorPreview)
 
-        # 2B) HEX section (always visible)
         self.controlsLayout.addWidget(QLabel("HEX"))
         self.controlsLayout.addWidget(self.createDivider())
 
@@ -314,8 +366,6 @@ class ColorPicker(QWidget):
         self.hexEdit.focusInEvent = self.onHexEditFocusIn
         self.hexEdit.focusOutEvent = self.onHexEditFocusOut
 
-        # 2C) Format1 + Format2 dynamic sections
-        #     We'll use a container layout so we can re-populate on demand
         self.formatContainer = QVBoxLayout()
         self.controlsLayout.addLayout(self.formatContainer)
 
@@ -356,7 +406,7 @@ class ColorPicker(QWidget):
         # Clear any existing widgets/layouts in self.formatContainer.
         self.clearLayout(self.formatContainer)
 
-        # Now rebuild sections as before:
+        # Now rebuild sections:
         self.buildFormatSection(self.format1, sectionIndex=1)
         self.buildFormatSection(self.format2, sectionIndex=2)
 
@@ -365,7 +415,6 @@ class ColorPicker(QWidget):
         self.layout().update()
         self.layout().activate()
 
-        # Now adjust
         self.adjustSize()
         self.updateGeometry()
         
@@ -396,7 +445,6 @@ class ColorPicker(QWidget):
         """
         formatLayout = QVBoxLayout()
 
-        # 1) Format label (clickable)
         formatButton = QPushButton(formatName, objectName="FormatLabel")
         formatButton.clicked.connect(
             lambda: self.showFormatPopup(sectionIndex)
@@ -404,17 +452,38 @@ class ColorPicker(QWidget):
         formatLayout.addWidget(formatButton)
         formatLayout.addWidget(self.createDivider())
 
-        # 2) Channels for this format
-        for channelName in self.FORMAT_CHANNELS[formatName]:
+        if formatName == "Pantone":
+            # Create Pantone-specific UI
             rowLayout = QHBoxLayout()
-            slider, spinbox = self.createChannelControls(
-                channelName, sectionIndex
-            )
-            rowLayout.addWidget(slider)
-            rowLayout.addWidget(spinbox)
+            
+            # Color preview rectangle
+            pantonePreview = QFrame()
+            pantonePreview.setFixedSize(40, 25)
+            pantonePreview.setStyleSheet("background: gray; border: 1px solid #444;")
+            
+            # Text input
+            pantoneEdit = QLineEdit()
+            pantoneEdit.setPlaceholderText("Enter Pantone name")
+            
+            rowLayout.addWidget(pantonePreview)
+            rowLayout.addWidget(pantoneEdit)
             formatLayout.addLayout(rowLayout)
+            
+            # Store references
+            self.sliders[(sectionIndex, "PantoneColor")] = pantonePreview
+            self.spinboxes[(sectionIndex, "PantoneColor")] = pantoneEdit
 
-        # Put it all in our container
+            pantoneEdit.textEdited.connect(self.onPantoneChanged)
+        else:
+            for channelName in self.FORMAT_CHANNELS[formatName]:
+                rowLayout = QHBoxLayout()
+                slider, spinbox = self.createChannelControls(
+                    channelName, sectionIndex
+                )
+                rowLayout.addWidget(slider)
+                rowLayout.addWidget(spinbox)
+                formatLayout.addLayout(rowLayout)
+
         self.formatContainer.addLayout(formatLayout)
 
     def showFormatPopup(self, sectionIndex):
@@ -426,7 +495,7 @@ class ColorPicker(QWidget):
         menu.setStyleSheet(styles.DARK_STYLE)
         for fmt in self.FORMAT_CHANNELS.keys():
             if fmt == self.getFormat(sectionIndex):
-                continue  # skip adding the same format if you want
+                continue  # skip adding the same format
             action = menu.addAction(fmt)
             action.triggered.connect(partial(self.onFormatChanged, sectionIndex, fmt))
         # Display the menu under the mouse
@@ -481,13 +550,20 @@ class ColorPicker(QWidget):
         Binds them so that changing one updates the other, and also updates the color.
         We store references in self.sliders/spinboxes[(sectionIndex, channelName)].
         """
+        if channelName == "PantoneColor":
+            return None, None
+
         info = self.CHANNEL_INFO[channelName]
         minVal, maxVal = info["sliderRange"]
 
-        slider = QSlider(Qt.Horizontal)
-        slider.setRange(minVal, maxVal)
+        if info.get("round") != None and info["round"] == False:
+            slider = QDoubleSlider(3, Qt.Horizontal)
+            spinbox = QDoubleSpinBox(decimals=3)
+        else:
+            slider = QSlider(Qt.Horizontal)
+            spinbox = QSpinBox()
 
-        spinbox = QSpinBox()
+        slider.setRange(minVal, maxVal)
         spinbox.setRange(minVal, maxVal)
 
         # Make sure we store them for later reference
@@ -499,7 +575,10 @@ class ColorPicker(QWidget):
             self.synchronizeControls(slider, spinbox, value)
             self.onChannelChanged(sectionIndex, channelName, value)
 
-        slider.valueChanged.connect(onValueChanged)
+        if info.get("round") != None and info["round"] == False:
+            slider.doubleValueChanged.connect(onValueChanged)
+        else:
+            slider.valueChanged.connect(onValueChanged)
         spinbox.valueChanged.connect(onValueChanged)
 
         return slider, spinbox
@@ -529,6 +608,13 @@ class ColorPicker(QWidget):
 
         # Update the global color
         Settings.set("currentColor", newColor)
+
+    def onPantoneChanged(self, text):
+        """Handle Pantone name input"""
+        color = Settings.get("currentColor")
+        color.setPantone(text.strip())
+        Settings.set("currentColor", color)
+
 
     def synchronizeControls(self, slider, spinBox, value):
         """Synchronize slider and spinbox values (blocking signals)."""
@@ -562,10 +648,23 @@ class ColorPicker(QWidget):
 
         # For each visible channel, sync the slider/spin with the new color
         for key, slider in self.sliders.items():
+            
             sectionIndex, channelName = key
             # If the channel doesn't match the current format for that section, skip
             activeChannels = self.FORMAT_CHANNELS[self.getFormat(sectionIndex)]
             if channelName not in activeChannels:
+                continue
+
+            if channelName == "PantoneColor":
+                pantone_name = self.CHANNEL_INFO["PantoneColor"]["get"](color)
+                lab_color = PantoneData().get_lab(pantone_name)
+                if lab_color:
+                    new_color = QColorEnhanced(QColor(255,255,255))
+                    new_color.setLab(lab_color[0], lab_color[1], lab_color[2])
+                    spin = self.spinboxes[key]
+                    slider.setStyleSheet(f"background: {new_color.name()}; border: 1px solid #444;")
+                    if not spin.hasFocus():
+                        spin.setText(pantone_name or "")
                 continue
 
             info = self.CHANNEL_INFO[channelName]
@@ -595,13 +694,11 @@ class ColorPicker(QWidget):
         # Map this proportion to the slider range
         sliderValueFloat = proportion * (sliderMax - sliderMin) + sliderMin
         
-        # Since slider value must be an integer, decide on rounding
-        # Common approaches:
-        # - Round to nearest integer
-        # - Floor to nearest lower integer
-        # - Ceil to nearest higher integer
-        # Here, we'll use round
-        sliderValue = int(sliderValueFloat)
+        # Since slider value must be an integer, round
+        if self.CHANNEL_INFO[channel_name].get("round") != None and self.CHANNEL_INFO[channel_name]["round"] == False:
+            sliderValue = sliderValueFloat
+        else:
+            sliderValue = int(sliderValueFloat)
         
         # Ensure slider_value is within slider bounds after rounding
         sliderValue = max(sliderMin, min(sliderMax, sliderValue))
@@ -688,8 +785,6 @@ class ColorPicker(QWidget):
 
         self.colorPreview.setStyleSheet(style)
 
-        # (Optional) Show some text on the button if you like
-        # e.g., the color in some format
         fmtFunc = ClipboardManager.getTemplate(Settings.get("FORMAT"))
         if fmtFunc:
             self.colorPreview.setText(fmtFunc(currentColor))
@@ -707,9 +802,6 @@ class ColorPicker(QWidget):
     #  Hex editing
     # -----------------------------
     def onHexChanged(self, text):
-        """
-        User typed something in the HEX line edit. If valid, update the color.
-        """
         color = QColorEnhanced(QColor(text))
         if color.isValid():
             Settings.set("currentColor", color)
@@ -718,7 +810,6 @@ class ColorPicker(QWidget):
     #  History and saving
     # -----------------------------
     def onSave(self):
-        """Save the current color to history"""
         if self.history:
             self.history.currentSelectedButton = len(Settings.get("colors"))
         Settings.appendToHistory(Settings.get("currentColor").qcolor)

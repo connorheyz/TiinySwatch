@@ -2,7 +2,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon
 from PySide6.QtGui import (QIcon, QPixmap, QPainter, QCursor, QGuiApplication, 
                           QBrush)
-from utils import Settings, KeybindManager
+from utils import Settings, KeybindManager, PantoneData
 from dialogs import TransparentOverlay
 from widgets import ColorPicker
 from menus import SettingsMenu
@@ -15,7 +15,7 @@ class App(QMainWindow):
     DEFAULT_WINDOW_GEOMETRY = (300, 300, 250, 150)
 
     # Signals
-    initiateOverlaySignal = Signal()
+    toggleOverlaySignal = Signal()
     toggleColorPickerSignal = Signal()
     toggleHistoryWidgetSignal = Signal()
 
@@ -26,6 +26,7 @@ class App(QMainWindow):
         self.colorPicker = None
         self.overlay = None
         self.pickerToggled = False
+        self.overlayToggled = False
         self.setStyleSheet(styles.DARK_STYLE)
         
         self.initializeUI()
@@ -47,14 +48,14 @@ class App(QMainWindow):
 
     def setupSignals(self):
         """Setup signal connections"""
-        self.initiateOverlaySignal.connect(self.initiateColorPick)
+        self.toggleOverlaySignal.connect(self.toggleColorPick)
         self.toggleColorPickerSignal.connect(self.toggleColorPicker)
         self.toggleHistoryWidgetSignal.connect(self.toggleHistoryWidget)
         Settings.addListener("SET", "currentColor", self.updateColorInfo)
 
     def setupHotkeys(self):
         """Setup keyboard shortcuts"""
-        self.keybindManager.bindKey("PICK_KEYBIND", lambda: self.initiateOverlaySignal.emit())
+        self.keybindManager.bindKey("PICK_KEYBIND", lambda: self.toggleOverlaySignal.emit())
         self.keybindManager.bindKey("TOGGLE_KEYBIND", lambda: self.toggleColorPickerSignal.emit())
         self.keybindManager.bindKey("HISTORY_KEYBIND", lambda: self.toggleHistoryWidgetSignal.emit())
 
@@ -92,7 +93,7 @@ class App(QMainWindow):
         # Update tray icon
         self.trayIcon.setIcon(self.createColoredIcon(color.qcolor))
 
-    def initiateColorPick(self):
+    def toggleColorPick(self):
         """Start the color picking process"""
         screen = QGuiApplication.primaryScreen()
         dpi = screen.devicePixelRatio()
@@ -102,6 +103,10 @@ class App(QMainWindow):
         if not self.overlay:
             self.overlay = TransparentOverlay(self, screenshot)
             self.overlay.show()
+            self.overlayToggled = True
+        else:
+            self.overlay.close()
+            
 
     def onTrayActivation(self, reason):
         """Handle tray icon activation"""
@@ -124,6 +129,6 @@ class App(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)    
+    app.setQuitOnLastWindowClosed(False)
     ex = App()
     sys.exit(app.exec())

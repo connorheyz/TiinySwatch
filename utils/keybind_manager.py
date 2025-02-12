@@ -1,7 +1,6 @@
-import sys
 import ctypes
 import ctypes.wintypes
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QWidget
 from utils import Settings
 
@@ -112,7 +111,6 @@ class KeybindManager(QWidget):
         if bind['current'] == new_hotkey:
             return
 
-        old_hk = bind['current']
         bind['current'] = new_hotkey
         
         if bind['hk_id'] is not None:

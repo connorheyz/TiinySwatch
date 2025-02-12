@@ -37,7 +37,7 @@ class Settings:
             'default': 'HSV'
         },
         'SLIDER_FORMAT_2': {
-            'default': 'RGB'
+            'default': 'sRGB'
         },
         'VALUE_ONLY': {
             'default': False,
@@ -55,6 +55,13 @@ class Settings:
             # Convert the stored hex string to a QColor, and back to hex on save.
             'load_converter': lambda val: val.clone() if isinstance(val, QColorEnhanced) else QColorEnhanced(QColor(val)),
             'save_converter': lambda val: val.qcolor.name() if isinstance(val, QColorEnhanced) else '#ffffff',
+        },
+        'selectedColors': {
+            'default': [],
+            # Convert a list of color hex strings to a list of QColors when loading,
+            # and the reverse when saving.
+            'load_converter': lambda val: [QColor(c) for c in val] if isinstance(val, list) else [],
+            'save_converter': lambda val: [c.name() for c in val] if isinstance(val, list) else [],
         },
     }
     
@@ -107,9 +114,11 @@ class Settings:
             cls._qsettings.setValue(key, store_value)
 
     @classmethod
-    def get(cls, key):
+    def get(cls, key, default=None):
         """Get a setting by key and notify GET listeners."""
         if key not in cls._settingsDict:
+            if default:
+                return default
             raise KeyError(f"{key} is not a valid setting.")
         
         value = cls._settingsDict[key]
