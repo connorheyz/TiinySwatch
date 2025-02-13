@@ -23,6 +23,8 @@ class App(QMainWindow):
         super().__init__()
         Settings.load()
         self.keybindManager = KeybindManager.initialize(self)
+        PantoneData.generate_xyz_json()
+        PantoneData.initialize()
         self.colorPicker = None
         self.overlay = None
         self.pickerToggled = False

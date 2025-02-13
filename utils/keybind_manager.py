@@ -94,12 +94,16 @@ class KeybindManager(QWidget):
         modifiers = 0
         parts = hotkey_str.lower().split('+')
         for part in parts[:-1]:
-            match part:
-                case 'ctrl': modifiers |= MOD_CONTROL
-                case 'alt': modifiers |= MOD_ALT
-                case 'shift': modifiers |= MOD_SHIFT
-                case 'win': modifiers |= MOD_WIN
-                case _: raise ValueError(f"Invalid modifier: {part}")
+            if (part == 'ctrl'):
+                modifiers |= MOD_CONTROL
+            elif (part == 'alt'):
+                modifiers |= MOD_ALT
+            elif (part == 'shift'):
+                modifiers |= MOD_SHIFT
+            elif (part == 'win'):
+                modifiers |= MOD_WIN
+            else:
+                raise ValueError(f"Invalid modifier: {part}")
         
         vk_str = parts[-1]
         vk = VIRTUAL_KEY_CODES.get(vk_str)

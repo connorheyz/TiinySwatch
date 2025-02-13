@@ -6,6 +6,8 @@ from colormath.color_objects import (
     AdobeRGBColor
 )
 from .pantone_data import PantoneData
+import numpy as np
+import math
 
 class QColorEnhanced:
     """
@@ -20,6 +22,21 @@ class QColorEnhanced:
       round-trip away.
     - All other color spaces are marked dirty whenever one space is set.
     """
+    _M1 = np.array([
+        [1.716651187971268, -0.355670783776392, -0.253366281373660],
+        [-0.666684351832489, 1.616481236634939, 0.015768545813911],
+        [0.017639857445311, -0.042770613257809, 0.942103121235474]
+    ])
+    _M2 = (1/4096.0) * np.array([
+        [1688, 2146, 262],
+        [683, 2951, 462],
+        [99, 309, 3688]
+    ])
+    # Composite matrix: converts XYZ directly to LMS.
+    _XYZ_TO_LMS_MATRIX = _M2 @ _M1
+
+    # Class variable to hold the precomputed Pantone candidate ITP values.
+    _pantone_itp_values = None
 
     def __init__(self, qcolor: QColor):
         self.qcolor = qcolor
@@ -37,7 +54,7 @@ class QColorEnhanced:
                 'components': {'x': 0.0, 'y': 0.0, 'z': 0.0},
                 'dirty': True,
                 'observer': '2',
-                'illuminant': 'd50',
+                'illuminant': 'd65',
                 'to_xyz': self._xyz_to_xyz,
                 'from_xyz': self._xyz_from_xyz,
             },
@@ -63,7 +80,7 @@ class QColorEnhanced:
                 'is_upscaled': False,
                 'to_xyz': self._adobe_to_xyz,
                 'from_xyz': self._xyz_to_adobe,
-            },
+            }
         }
 
     # -----------------------------------------------------------
@@ -78,7 +95,7 @@ class QColorEnhanced:
             observer=self._color_spaces['lab']['observer'],
             illuminant=self._color_spaces['lab']['illuminant']
         )
-        return convert_color(lab_color, XYZColor)
+        return convert_color(lab_color, XYZColor, target_illuminant=self._color_spaces['xyz']['illuminant'])
 
     def _xyz_to_lab(self, xyz_color):
         lab_color = convert_color(xyz_color, LabColor)
@@ -112,7 +129,7 @@ class QColorEnhanced:
             observer=self._color_spaces['xyy']['observer'],
             illuminant=self._color_spaces['xyy']['illuminant']
         )
-        return convert_color(cspace, XYZColor)
+        return convert_color(cspace, XYZColor, target_illuminant=self._color_spaces['xyz']['illuminant'])
 
     def _xyz_to_xyy(self, xyz_color):
         xyy_obj = convert_color(xyz_color, xyYColor)
@@ -130,7 +147,7 @@ class QColorEnhanced:
             observer=self._color_spaces['luv']['observer'],
             illuminant=self._color_spaces['luv']['illuminant']
         )
-        return convert_color(cspace, XYZColor)
+        return convert_color(cspace, XYZColor, target_illuminant=self._color_spaces['xyz']['illuminant'])
 
     def _xyz_to_luv(self, xyz_color):
         luv_obj = convert_color(xyz_color, LuvColor)
@@ -145,7 +162,7 @@ class QColorEnhanced:
             comps['r'], comps['g'], comps['b'], 
             is_upscaled=self._color_spaces['adobe_rgb']['is_upscaled']
         )
-        return convert_color(adobe, XYZColor)
+        return convert_color(adobe, XYZColor, target_illuminant=self._color_spaces['xyz']['illuminant'])
 
     def _xyz_to_adobe(self, xyz_color):
         adobe = convert_color(xyz_color, AdobeRGBColor)
@@ -156,7 +173,7 @@ class QColorEnhanced:
         }
 
     def _srgb_to_xyz(self, srgb):
-        return convert_color(srgb, XYZColor)
+        return convert_color(srgb, XYZColor, target_illuminant=self._color_spaces['xyz']['illuminant'])
 
     def _xyz_to_srgb(self, xyz_color):
         return convert_color(xyz_color, sRGBColor)
@@ -275,30 +292,118 @@ class QColorEnhanced:
         self._color_spaces['adobe_rgb']['dirty'] = True
 
     # -----------------------------------------------------------
+    # BT2020 getters and setters
+    # -----------------------------------------------------------
+
+    def getBT2020(self):
+        self._ensureSpaceInSync('bt2020')
+        return self._color_spaces['bt2020']['components']
+
+    def setBT2020(self, r=None, g=None, b=None):
+        adobe_data = self._color_spaces['bt2020']['components']
+        adobe_data['r'] = r if r is not None else adobe_data['r']
+        adobe_data['g'] = g if g is not None else adobe_data['g']
+        adobe_data['b'] = b if b is not None else adobe_data['b']
+        self._syncQColorFromSpace('bt2020')
+
+    # -----------------------------------------------------------
     # Pantone getters and setters
     # -----------------------------------------------------------
     def getPantone(self):
         """
         Finds and returns the name of the closest Pantone color based on Lab distance.
         """
-        self._ensureSpaceInSync('lab')
-        current_lab = self.getLab()
-        l, a, b = current_lab['L'], current_lab['a'], current_lab['b']
+        self._ensureSpaceInSync('xyz')
+        xyz = self.getXYZ()
         
-        pantone_data = PantoneData()
-        closest_name = pantone_data.find_closest(l, a, b)
+        closest_name = QColorEnhanced.find_closest_pantone(np.array([xyz["x"], xyz["y"], xyz["z"]]))
 
         return closest_name
 
     def setPantone(self, name):
-        pantone_data = PantoneData()
-        lab_value = pantone_data.get_lab(name)
-        if lab_value:
-            self.setLab(lab_value[0], lab_value[1], lab_value[2])
+        xyz_value = PantoneData.get_xyz(name)
+        if xyz_value:
+            self.setXYZ(xyz_value[0], xyz_value[1], xyz_value[2])
+
+    @classmethod
+    def _compute_itp_from_xyz(cls, xyz_array):
+        """
+        Converts an array of XYZ values (shape: [N,3]) to ITP values.
+        """
+        # Convert XYZ to LMS in one step (vectorized).
+        lms = xyz_array @ cls._XYZ_TO_LMS_MATRIX.T
+
+        # Apply the inverse electro-optical transfer function (EOTF) elementwise.
+        y = lms / 10000.0
+        m1 = 0.1593017578125
+        m2 = 78.84375
+        c1 = 0.8359375
+        c2 = 18.8515625
+        c3 = 18.6875
+        lms_prime = ((c1 + c2 * np.power(y, m1)) / (1 + c3 * np.power(y, m1))) ** m2
+
+        # Convert LMS' to ITP.
+        itp = np.empty_like(lms_prime)
+        itp[:, 0] = 0.5 * lms_prime[:, 0] + 0.5 * lms_prime[:, 1]
+        itp[:, 1] = (6610 * lms_prime[:, 0] - 13613 * lms_prime[:, 1] + 7003 * lms_prime[:, 2]) / 8192.0
+        itp[:, 2] = (17933 * lms_prime[:, 0] - 17390 * lms_prime[:, 1] - 543 * lms_prime[:, 2]) / 4096.0
+        return itp
+
+    @classmethod
+    def _xyz_to_itp(cls, xyz):
+        """
+        Converts a single XYZ value (array of shape (3,)) to an ITP value.
+        """
+        # Convert to LMS.
+        lms = cls._XYZ_TO_LMS_MATRIX @ xyz
+        y = lms / 10000.0
+        m1 = 0.1593017578125
+        m2 = 78.84375
+        c1 = 0.8359375
+        c2 = 18.8515625
+        c3 = 18.6875
+        lms_prime = ((c1 + c2 * np.power(y, m1)) / (1 + c3 * np.power(y, m1))) ** m2
+
+        # Convert LMS' to ITP.
+        itp = np.empty(3)
+        itp[0] = 0.5 * lms_prime[0] + 0.5 * lms_prime[1]
+        itp[1] = (6610 * lms_prime[0] - 13613 * lms_prime[1] + 7003 * lms_prime[2]) / 8192.0
+        itp[2] = (17933 * lms_prime[0] - 17390 * lms_prime[1] - 543 * lms_prime[2]) / 4096.0
+        return itp
+
+    @classmethod
+    def _initialize_pantone_itp(cls):
+        """
+        Precompute the Pantone candidate ITP values from the static PantoneData.
+        """
+        if cls._pantone_itp_values is None:
+            xyz_candidates = np.array(PantoneData.xyz_values)  # shape: (N, 3)
+            cls._pantone_itp_values = cls._compute_itp_from_xyz(xyz_candidates)
+
+    @classmethod
+    def find_closest_pantone(cls, target_xyz):
+        """
+        Finds the closest Pantone color to the given target XYZ.
+        
+        Parameters:
+            target_xyz (array-like): XYZ values (shape: (3,)) of the target color.
+        
+        Returns:
+            str: The name of the closest Pantone color.
+        """
+        cls._initialize_pantone_itp()
+        # Convert the target XYZ to ITP.
+        target_xyz = np.asarray(target_xyz)  # ensure it's a NumPy array of shape (3,)
+        target_itp = cls._xyz_to_itp(target_xyz)
+
+        # Compute Euclidean distances in ITP space (vectorized).
+        diff = cls._pantone_itp_values - target_itp  # broadcast target_itp to each candidate.
+        distances = np.linalg.norm(diff, axis=1)
+        best_index = np.argmin(distances)
+        return PantoneData.names[best_index]
     # -----------------------------------------------------------
     # Wrapped QColor getters and setters
     # -----------------------------------------------------------
-
     def red(self):
         return self.qcolor.red()
 

@@ -38,14 +38,14 @@ class ColorPicker(QWidget):
         "HSVSaturation": {
             "actualRange": (0, 255),
             "sliderRange": (0, 255),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.hsvSaturation(),
             "set": lambda c, v: c.setHsv(c.hsvHue(), v, c.value(), c.alpha())
         },
         "Value": {
             "actualRange": (0, 255),
             "sliderRange": (0, 255),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.value(),
             "set": lambda c, v: c.setHsv(c.hsvHue(), c.hsvSaturation(), v, c.alpha())
         },
@@ -59,63 +59,63 @@ class ColorPicker(QWidget):
         "HSLSaturation": {
             "actualRange": (0, 255),
             "sliderRange": (0, 255),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.hslSaturation(),
             "set": lambda c, v: c.setHsl(c.hslHue(), v, c.lightness(), c.alpha())
         },
         "HSLLightness": {
             "actualRange": (0, 255),
             "sliderRange": (0, 255),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.lightness(),
             "set": lambda c, v: c.setHsl(c.hslHue(), c.hslSaturation(), v, c.alpha()),
         },
         "Red": {
             "actualRange": (0, 255),
             "sliderRange": (0, 255),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.red(),
             "set": lambda c, v: c.setRgb(v, c.green(), c.blue(), c.alpha())
         },
         "Green": {
             "actualRange": (0, 255),
             "sliderRange": (0, 255),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.green(),
             "set": lambda c, v: c.setRgb(c.red(), v, c.blue(), c.alpha())
         },
         "Blue": {
             "actualRange": (0, 255),
             "sliderRange": (0, 255),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.blue(),
             "set": lambda c, v: c.setRgb(c.red(), c.green(), v, c.alpha())
         },
         "Cyan": {
             "actualRange": (0, 255),
             "sliderRange": (0, 100),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.cyan(),
             "set": lambda c, v: c.setCmyk(v, c.magenta(), c.yellow(), c.black(), c.alpha())
         },
         "Magenta": {
             "actualRange": (0, 255),
             "sliderRange": (0, 100),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.magenta(),
             "set": lambda c, v: c.setCmyk(c.cyan(), v, c.yellow(), c.black(), c.alpha())
         },
         "Yellow": {
             "actualRange": (0, 255),
             "sliderRange": (0, 100),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.yellow(),
             "set": lambda c, v: c.setCmyk(c.cyan(), c.magenta(), v, c.black(), c.alpha())
         },
         "Key": {
             "actualRange": (0, 255),
             "sliderRange": (0, 100),
-            "steps": 10,
+            "steps": 1,
             "get": lambda c: c.black(),
             "set": lambda c, v: c.setCmyk(c.cyan(), c.magenta(), c.yellow(), v, c.alpha())
         },
@@ -146,7 +146,7 @@ class ColorPicker(QWidget):
         "XYZX": {
             # Often X, Y, Z are in 0..1 or 0..100. Choose 0..100 for a bigger editing range
             "actualRange": (0, 1.0),
-            "sliderRange": (0, 100),
+            "sliderRange": (0, 1.0),
             "steps": 10,
             "get": lambda c: c.getXYZ()['x'],
             "set": lambda c, v: c.setXYZ(x=v),
@@ -154,7 +154,7 @@ class ColorPicker(QWidget):
         },
         "XYZY": {
             "actualRange": (0, 1.0),
-            "sliderRange": (0, 100),
+            "sliderRange": (0, 1.0),
             "steps": 10,
             "get": lambda c: c.getXYZ()['y'],
             "set": lambda c, v: c.setXYZ(y=v),
@@ -162,14 +162,13 @@ class ColorPicker(QWidget):
         },
         "XYZZ": {
             "actualRange": (0, 1.0),
-            "sliderRange": (0, 100),
+            "sliderRange": (0, 1.0),
             "steps": 10,
             "get": lambda c: c.getXYZ()['z'],
             "set": lambda c, v: c.setXYZ(z=v),
             "round": False
         },
         "LuvL": {
-            # L in [0..100], while u,v can be roughly [-100..100]
             "actualRange": (0, 100),
             "sliderRange": (0, 100),
             "steps": 25,
@@ -232,7 +231,7 @@ class ColorPicker(QWidget):
         },
         "xyYY": {
             "actualRange": (0, 1.0),
-            "sliderRange": (0, 100),
+            "sliderRange": (0, 1.0),
             "steps": 10,
             "get": lambda c: c.getxyY()['Y'],
             "set": lambda c, v: c.setxyY(Y=v),
@@ -475,14 +474,15 @@ class ColorPicker(QWidget):
 
             pantoneEdit.textEdited.connect(self.onPantoneChanged)
         else:
-            for channelName in self.FORMAT_CHANNELS[formatName]:
-                rowLayout = QHBoxLayout()
-                slider, spinbox = self.createChannelControls(
-                    channelName, sectionIndex
-                )
-                rowLayout.addWidget(slider)
-                rowLayout.addWidget(spinbox)
-                formatLayout.addLayout(rowLayout)
+            if (formatName in self.FORMAT_CHANNELS): 
+                for channelName in self.FORMAT_CHANNELS[formatName]:
+                    rowLayout = QHBoxLayout()
+                    slider, spinbox = self.createChannelControls(
+                        channelName, sectionIndex
+                    )
+                    rowLayout.addWidget(slider)
+                    rowLayout.addWidget(spinbox)
+                    formatLayout.addLayout(rowLayout)
 
         self.formatContainer.addLayout(formatLayout)
 
@@ -559,6 +559,7 @@ class ColorPicker(QWidget):
         if info.get("round") != None and info["round"] == False:
             slider = QDoubleSlider(3, Qt.Horizontal)
             spinbox = QDoubleSpinBox(decimals=3)
+            spinbox.setSingleStep(0.001)
         else:
             slider = QSlider(Qt.Horizontal)
             spinbox = QSpinBox()
@@ -657,10 +658,10 @@ class ColorPicker(QWidget):
 
             if channelName == "PantoneColor":
                 pantone_name = self.CHANNEL_INFO["PantoneColor"]["get"](color)
-                lab_color = PantoneData().get_lab(pantone_name)
-                if lab_color:
+                xyz_color = PantoneData.get_xyz(pantone_name)
+                if xyz_color:
                     new_color = QColorEnhanced(QColor(255,255,255))
-                    new_color.setLab(lab_color[0], lab_color[1], lab_color[2])
+                    new_color.setXYZ(xyz_color[0], xyz_color[1], xyz_color[2])
                     spin = self.spinboxes[key]
                     slider.setStyleSheet(f"background: {new_color.name()}; border: 1px solid #444;")
                     if not spin.hasFocus():
