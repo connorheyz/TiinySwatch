@@ -52,11 +52,15 @@ class ClipboardManager:
         return template(color)
     
     @classmethod
-    def copySelectedColorsToClipboard(cls):
+    def copyColorsToClipboard(cls, indices):
         clipboard = QApplication.clipboard()
-        selected_colors = Settings.get("selectedColors")
+        colors = Settings.get("colors")
 
-        clipboard_strings = [cls.getFormattedColor(color) for color in selected_colors]
+        clipboard_strings = []
+
+        for i in range(len(colors)):
+            if i in indices:
+                clipboard_strings.append(cls.getFormattedColor(colors[i]))
 
         clipboard.setText("\n".join(clipboard_strings))
 

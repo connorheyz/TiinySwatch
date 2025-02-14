@@ -1,10 +1,10 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent, QRect
 from PySide6.QtWidgets import (
     QGridLayout, QLabel, QSpacerItem, QSizePolicy, QHBoxLayout,
     QPushButton, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QApplication
 )
 from PySide6 import QtCore
-from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut
+from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut, QPainter, QPen
 from functools import partial
 from utils import Settings, ClipboardManager
 import styles
@@ -22,8 +22,8 @@ class HistoryPalette(QWidget):
             }
         """,
         'TOP_BAR': "background-color: #1e1f22;",
+        # The following styles are kept for buttons in their normal or current state.
         'SELECTED_COLOR': lambda color: f"background-color: {color}; border: 2px solid white",
-        'SELECTED_COLOR_OTHER': lambda color: f"background-color: {color}; border: 2px solid #b0b0b0",
         'NORMAL_COLOR': lambda color: f"background-color: {color}; border: none"
     }
 
@@ -33,6 +33,7 @@ class HistoryPalette(QWidget):
         self.lastMousePosition = None
         self.currentSelectedButton = -1
         self.anchorIndex = -1  # Track selection anchor
+        self.selectedIndices = []  # Local list of selected indices
         self.colorButtons = []
 
         self.initializeWindow()
@@ -46,9 +47,12 @@ class HistoryPalette(QWidget):
 
     def setupConnections(self):
         self.copyShortcut = QShortcut(QKeySequence(self.COPY_SHORTCUT), self)
-        self.copyShortcut.activated.connect(ClipboardManager.copySelectedColorsToClipboard)
+        self.copyShortcut.activated.connect(self.copyCurrentColors)
+        # No longer listening to a global "selectedColors" setting.
         Settings.addListener("SET", "colors", self.updateColors)
-        Settings.addListener("SET", "selectedColors", self.updateColors)
+
+    def copyCurrentColors(self):
+        ClipboardManager.copyColorsToClipboard(self.selectedIndices)
 
     def setupUI(self):
         mainLayout = QVBoxLayout(self)
@@ -98,6 +102,7 @@ class HistoryPalette(QWidget):
             self.addColorButton(index, color)
         self.addSpacersIfNeeded(len(colors))
         self.adjustSize()
+        self.update()  # Trigger a repaint to update the selection outline
 
     def clearColorGrid(self):
         while self.colorGrid.count():
@@ -111,17 +116,12 @@ class HistoryPalette(QWidget):
         colorBtn = QPushButton(self)
         colorBtn.setFixedSize(self.BUTTON_SIZE, self.BUTTON_SIZE)
         
-        selected_colors = Settings.get("selectedColors", [])
-        is_selected = color in selected_colors
+        # Instead of per-button selection borders, we only mark the current button.
         is_current = index == self.currentSelectedButton
-        
         if is_current:
             style = self.STYLES['SELECTED_COLOR'](color.name())
-        elif is_selected:
-            style = self.STYLES['SELECTED_COLOR_OTHER'](color.name())
         else:
             style = self.STYLES['NORMAL_COLOR'](color.name())
-        
         colorBtn.setStyleSheet(style)
         self.colorButtons.append(colorBtn)
         self.colorGrid.addWidget(colorBtn, row, col)
@@ -132,71 +132,66 @@ class HistoryPalette(QWidget):
         colors = Settings.get("colors", [])
         if not (0 <= index < len(colors)):
             return
-        
-        current_color = colors[index]
-        selected_colors = Settings.get("selectedColors", [])
-        new_selected = []
-        
+
         if modifiers & Qt.ShiftModifier:
             if self.anchorIndex == -1 or self.anchorIndex >= len(colors):
                 self.anchorIndex = index
-                new_selected = [current_color]
+                new_selected = [index]
             else:
                 start = min(self.anchorIndex, index)
                 end = max(self.anchorIndex, index)
-                new_selected = colors[start:end+1]
+                new_selected = list(range(start, end + 1))
         elif modifiers & Qt.ControlModifier:
-            new_selected = list(selected_colors)
-            if current_color in new_selected:
-                new_selected.remove(current_color)
+            new_selected = self.selectedIndices.copy()
+            if index in new_selected:
+                new_selected.remove(index)
             else:
-                new_selected.append(current_color)
+                new_selected.append(index)
         else:
             self.anchorIndex = index
-            new_selected = [current_color]
-        
-        Settings.set("selectedColors", new_selected)
+            new_selected = [index]
+
+        self.selectedIndices = new_selected
         self.currentSelectedButton = index
-        Settings.set("currentColor", current_color)
+        Settings.set("currentColor", colors[index])
         self.updateColors()
 
     def moveSelection(self, step):
         colors = Settings.get("colors", [])
         if not colors:
             return
-        
+
         current = self.currentSelectedButton
-        new_index = max(0, min(current + step, len(colors)-1)) if current != -1 else 0
+        new_index = max(0, min(current + step, len(colors) - 1)) if current != -1 else 0
         modifiers = QApplication.keyboardModifiers()
-        
+
         if modifiers & Qt.ShiftModifier:
             if self.anchorIndex == -1 or self.anchorIndex >= len(colors):
                 self.anchorIndex = new_index
-                new_selected = [colors[new_index]]
+                new_selected = [new_index]
             else:
                 start = min(self.anchorIndex, new_index)
                 end = max(self.anchorIndex, new_index)
-                new_selected = colors[start:end+1]
-            Settings.set("selectedColors", new_selected)
+                new_selected = list(range(start, end + 1))
+            self.selectedIndices = new_selected
         else:
-            if colors[new_index] not in Settings.get("selectedColors", []):
-                Settings.set("selectedColors", [colors[new_index]])
-                self.anchorIndex = new_index
-        
+            self.selectedIndices = [new_index]
+            self.anchorIndex = new_index
+
         self.currentSelectedButton = new_index
         Settings.set("currentColor", colors[new_index])
         self.updateColors()
 
     def handleDeleteKey(self):
-        selected_colors = Settings.get("selectedColors", [])
-        if not selected_colors:
+        if not self.selectedIndices:
             return
         
-        colors = [c for c in Settings.get("colors", []) if c not in selected_colors]
-        Settings.set("colors", colors)
-        Settings.set("selectedColors", [])
+        colors = Settings.get("colors", [])
+        new_colors = [c for i, c in enumerate(colors) if i not in self.selectedIndices]
+        Settings.set("colors", new_colors)
+        self.selectedIndices = []
         self.anchorIndex = -1
-        self.currentSelectedButton = -1 if not colors else 0
+        self.currentSelectedButton = 0 if new_colors else -1
         self.updateColors()
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -220,32 +215,27 @@ class HistoryPalette(QWidget):
             for i in range(self.GRID_COLUMNS - (colorCount % self.GRID_COLUMNS)):
                 spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Minimum)
                 self.colorGrid.addItem(spacer, row, colorCount % self.GRID_COLUMNS + i)
-            
+
     def exportPalette(self):
-        """Export the color palette"""
         options = QFileDialog.Options() | QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getSaveFileName(
             self, "Export Palette", "",
             "Paint.NET Palette Files (*.txt);;All Files (*)",
             options=options
         )
-        
         if not filename:
             return
-            
         try:
             self.writePaletteFile(filename)
             QMessageBox.information(self, "Export Successful", 
-                                  f"Palette exported successfully to {filename}")
+                                      f"Palette exported successfully to {filename}")
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", 
-                               f"An error occurred while exporting the palette:\n{e}")
-            
+                                 f"An error occurred while exporting the palette:\n{e}")
+
     def writePaletteFile(self, filename):
-        """Write the palette to a file"""
         colors = Settings.get("colors")
         maxColors = 96
-        
         with open(filename, 'w') as file:
             for i in range(maxColors):
                 if i < len(colors):
@@ -254,47 +244,79 @@ class HistoryPalette(QWidget):
                 else:
                     colorHex = "FFFFFFFF"
                 file.write(f"{colorHex}\n")
-                
+
     def closeWindow(self):
         self.close()
-        self.parent.historyToggled = False
+        if self.parent:
+            self.parent.historyToggled = False
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
         
-    # Event handlers
-    def keyPressEvent(self, event):
-        """Handle key press events"""
-        keyActions = {
-            Qt.Key_Delete: self.handleDeleteKey,
-            Qt.Key_Left: lambda: self.moveSelection(-1),
-            Qt.Key_Right: lambda: self.moveSelection(1),
-            Qt.Key_Up: lambda: self.moveSelection(-self.GRID_COLUMNS),
-            Qt.Key_Down: lambda: self.moveSelection(self.GRID_COLUMNS)
-        }
+        # Only draw outlines if more than one color is selected overall.
+        if len(self.selectedIndices) <= 1:
+            return
+
+        painter = QPainter(self)
+        pen = QPen(Qt.white)
+        pen.setWidth(2)  # Same weight as the current selection border.
+        pen.setStyle(Qt.DotLine)
+        painter.setPen(pen)
         
-        action = keyActions.get(event.key())
-        if action:
-            action()
-        else:
-            super().keyPressEvent(event)
+        # Group selected indices by their row.
+        rows = {}
+        for i in self.selectedIndices:
+            if i < len(self.colorButtons):
+                row = i // self.GRID_COLUMNS
+                rows.setdefault(row, []).append(i)
+        
+        # For each row, partition the selected indices into contiguous segments.
+        for row, indices in rows.items():
+            indices.sort()
+            segments = []
+            current_segment = [indices[0]]
+            for idx in indices[1:]:
+                # If the index is exactly one more than the previous, it's contiguous.
+                if idx == current_segment[-1] + 1:
+                    current_segment.append(idx)
+                else:
+                    segments.append(current_segment)
+                    current_segment = [idx]
+            if current_segment:
+                segments.append(current_segment)
             
+            # For each contiguous segment, calculate and draw its bounding rectangle.
+            for segment in segments:
+                boundingRect = None
+                for idx in segment:
+                    widgetRect = self.colorButtons[idx].geometry()  # Already in parent's coordinates.
+                    if boundingRect is None:
+                        boundingRect = widgetRect
+                    else:
+                        boundingRect = boundingRect.united(widgetRect)
+                if boundingRect is not None:
+                    # Expand the rectangle by 1 pixel in each direction so the outline sits outside the buttons.
+                    boundingRect = boundingRect.adjusted(-2, -2, 2, 2)
+                    painter.drawRect(boundingRect)
+        
+        painter.end()
+
     def mousePressEvent(self, event):
-        """Handle mouse press events"""
         if event.button() == Qt.LeftButton:
             self.lastMousePosition = event.pos()
             event.accept()
         else:
             super().mousePressEvent(event)
-            
+
     def mouseMoveEvent(self, event):
-        """Handle mouse move events"""
         if self.lastMousePosition:
             delta = event.pos() - self.lastMousePosition
             self.move(self.pos() + delta)
             event.accept()
         else:
             super().mouseMoveEvent(event)
-            
+
     def mouseReleaseEvent(self, event):
-        """Handle mouse release events"""
         if event.button() == Qt.LeftButton:
             self.lastMousePosition = None
             event.accept()

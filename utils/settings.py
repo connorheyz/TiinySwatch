@@ -33,11 +33,8 @@ class Settings:
             'default': True,
             'type': bool
         },
-        'SLIDER_FORMAT_1': {
-            'default': 'HSV'
-        },
-        'SLIDER_FORMAT_2': {
-            'default': 'sRGB'
+        'SLIDER_FORMATS': {
+            'default': ['HSV', 'sRGB']
         },
         'VALUE_ONLY': {
             'default': False,
@@ -55,13 +52,6 @@ class Settings:
             # Convert the stored hex string to a QColor, and back to hex on save.
             'load_converter': lambda val: val.clone() if isinstance(val, QColorEnhanced) else QColorEnhanced(QColor(val)),
             'save_converter': lambda val: val.qcolor.name() if isinstance(val, QColorEnhanced) else '#ffffff',
-        },
-        'selectedColors': {
-            'default': [],
-            # Convert a list of color hex strings to a list of QColors when loading,
-            # and the reverse when saving.
-            'load_converter': lambda val: [QColor(c) for c in val] if isinstance(val, list) else [],
-            'save_converter': lambda val: [c.name() for c in val] if isinstance(val, list) else [],
         },
     }
     

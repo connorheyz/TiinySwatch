@@ -38,8 +38,11 @@ class QColorEnhanced:
     # Class variable to hold the precomputed Pantone candidate ITP values.
     _pantone_itp_values = None
 
-    def __init__(self, qcolor: QColor):
-        self.qcolor = qcolor
+    def __init__(self, qcolor: QColor = None):
+        if qcolor == None:
+            self.qcolor = QColor(255, 255, 255)
+        else:
+            self.qcolor = qcolor
 
         self._color_spaces = {
             'lab': {

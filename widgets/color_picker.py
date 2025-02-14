@@ -1,315 +1,335 @@
 from functools import partial
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 from PySide6.QtWidgets import (
-    QApplication, QLabel, QSlider, QSpinBox, QDoubleSpinBox, QFrame,
-    QHBoxLayout, QPushButton, QVBoxLayout, QWidget, QLineEdit, QMenu, QSizePolicy
+    QApplication, QLabel, QFrame, QHBoxLayout, QPushButton, QVBoxLayout, 
+    QWidget, QLineEdit, QMenu, QSizePolicy, QLayout
 )
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QCursor
-from PySide6 import QtCore
 
 import styles
-from utils import Settings, ClipboardManager, QColorEnhanced, PantoneData
+from utils import Settings, ClipboardManager, QColorEnhanced
 from widgets import HistoryPalette
-from .q_double_slider import QDoubleSlider
+from .color_controls import COLOR_CONTROL_REGISTRY
 
 class ColorPicker(QWidget):
-    # Window flags
-    WINDOW_FLAGS = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | QtCore.Qt.Tool
+    WINDOW_FLAGS = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     SAVE_SHORTCUT = "Ctrl+S"
 
-    # Style templates
-    BASE_SLIDER_TEMPLATE = """
-        QSlider::groove:horizontal {{
-            background: {gradient};
-        }}
-        QSlider::handle:horizontal {{
-            background-color: {handleColor};
-        }}
-    """
-
-    CHANNEL_INFO = {
-        "HSVHue": {
-            "actualRange": (0, 359),
-            "sliderRange": (0, 359),
-            "steps": 20,
-            "get": lambda c: c.hsvHue(),
-            "set": lambda c, v: c.setHsv(v, c.hsvSaturation(), c.value(), c.alpha())
-        },
-        "HSVSaturation": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 255),
-            "steps": 1,
-            "get": lambda c: c.hsvSaturation(),
-            "set": lambda c, v: c.setHsv(c.hsvHue(), v, c.value(), c.alpha())
-        },
-        "Value": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 255),
-            "steps": 1,
-            "get": lambda c: c.value(),
-            "set": lambda c, v: c.setHsv(c.hsvHue(), c.hsvSaturation(), v, c.alpha())
-        },
-        "HSLHue": {
-            "actualRange": (0, 359),
-            "sliderRange": (0, 359),
-            "steps": 20,
-            "get": lambda c: c.hslHue(),
-            "set": lambda c, v: c.setHsl(v, c.hslSaturation(), c.lightness(), c.alpha())
-        },
-        "HSLSaturation": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 255),
-            "steps": 1,
-            "get": lambda c: c.hslSaturation(),
-            "set": lambda c, v: c.setHsl(c.hslHue(), v, c.lightness(), c.alpha())
-        },
-        "HSLLightness": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 255),
-            "steps": 1,
-            "get": lambda c: c.lightness(),
-            "set": lambda c, v: c.setHsl(c.hslHue(), c.hslSaturation(), v, c.alpha()),
-        },
-        "Red": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 255),
-            "steps": 1,
-            "get": lambda c: c.red(),
-            "set": lambda c, v: c.setRgb(v, c.green(), c.blue(), c.alpha())
-        },
-        "Green": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 255),
-            "steps": 1,
-            "get": lambda c: c.green(),
-            "set": lambda c, v: c.setRgb(c.red(), v, c.blue(), c.alpha())
-        },
-        "Blue": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 255),
-            "steps": 1,
-            "get": lambda c: c.blue(),
-            "set": lambda c, v: c.setRgb(c.red(), c.green(), v, c.alpha())
-        },
-        "Cyan": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 100),
-            "steps": 1,
-            "get": lambda c: c.cyan(),
-            "set": lambda c, v: c.setCmyk(v, c.magenta(), c.yellow(), c.black(), c.alpha())
-        },
-        "Magenta": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 100),
-            "steps": 1,
-            "get": lambda c: c.magenta(),
-            "set": lambda c, v: c.setCmyk(c.cyan(), v, c.yellow(), c.black(), c.alpha())
-        },
-        "Yellow": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 100),
-            "steps": 1,
-            "get": lambda c: c.yellow(),
-            "set": lambda c, v: c.setCmyk(c.cyan(), c.magenta(), v, c.black(), c.alpha())
-        },
-        "Key": {
-            "actualRange": (0, 255),
-            "sliderRange": (0, 100),
-            "steps": 1,
-            "get": lambda c: c.black(),
-            "set": lambda c, v: c.setCmyk(c.cyan(), c.magenta(), c.yellow(), v, c.alpha())
-        },
-        "LABLightness": {
-            "actualRange": (0, 100),
-            "sliderRange": (0, 100),
-            "steps": 10,
-            "get": lambda c: c.getLab()['L'],
-            "set": lambda c, v: c.setLab(L=v),
-            "round": False
-        },
-        "LABA": {
-            "actualRange": (-128, 127),
-            "sliderRange": (-128, 127),
-            "steps": 10,
-            "get": lambda c: c.getLab()['a'],
-            "set": lambda c, v: c.setLab(a=v),
-            "round": False
-        },
-        "LABB": {
-            "actualRange": (-128, 127),
-            "sliderRange": (-128, 127),
-            "steps": 10,
-            "get": lambda c: c.getLab()['b'],
-            "set": lambda c, v: c.setLab(b=v),
-            "round": False
-        },
-        "XYZX": {
-            # Often X, Y, Z are in 0..1 or 0..100. Choose 0..100 for a bigger editing range
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getXYZ()['x'],
-            "set": lambda c, v: c.setXYZ(x=v),
-            "round": False
-        },
-        "XYZY": {
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getXYZ()['y'],
-            "set": lambda c, v: c.setXYZ(y=v),
-            "round": False
-        },
-        "XYZZ": {
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getXYZ()['z'],
-            "set": lambda c, v: c.setXYZ(z=v),
-            "round": False
-        },
-        "LuvL": {
-            "actualRange": (0, 100),
-            "sliderRange": (0, 100),
-            "steps": 25,
-            "get": lambda c: c.getLuv()['L'],
-            "set": lambda c, v: c.setLuv(L=v)
-        },
-        "LuvU": {
-            "actualRange": (-100, 100),
-            "sliderRange": (-100, 100),
-            "steps": 25,
-            "get": lambda c: c.getLuv()['u'],
-            "set": lambda c, v: c.setLuv(u=v)
-        },
-        "LuvV": {
-            "actualRange": (-100, 100),
-            "sliderRange": (-100, 100),
-            "steps": 25,
-            "get": lambda c: c.getLuv()['v'],
-            "set": lambda c, v: c.setLuv(v=v)
-        },
-        "AdobeRed": {
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getAdobeRGB()['r'],
-            "set": lambda c, v: c.setAdobeRGB(r=v),
-            "round": False
-        },
-        "AdobeBlue": {
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getAdobeRGB()['b'],
-            "set": lambda c, v: c.setAdobeRGB(b=v),
-            "round": False
-        },
-        "AdobeGreen": {
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getAdobeRGB()['g'],
-            "set": lambda c, v: c.setAdobeRGB(g=v),
-            "round": False
-        },
-        "xyYx": {
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getxyY()['x'],
-            "set": lambda c, v: c.setxyY(x=v),
-            "round": False,
-        },
-        "xyYy": {
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getxyY()['y'],
-            "set": lambda c, v: c.setxyY(y=v),
-            "round": False
-        },
-        "xyYY": {
-            "actualRange": (0, 1.0),
-            "sliderRange": (0, 1.0),
-            "steps": 10,
-            "get": lambda c: c.getxyY()['Y'],
-            "set": lambda c, v: c.setxyY(Y=v),
-            "round": False
-        },
-        "PantoneColor": {
-            "get": lambda c: c.getPantone(),
-            "set": lambda c, v: c.setPantone(v),
-            "actualRange": (0, 1),  # Dummy values, not used
-            "sliderRange": (0, 1),  # Dummy values, not used
-            "steps": 1
-        },
-    }
-
-    # ------------------------------------------------------------------------
-    # Format definitions: which channels appear in which "format"
-    # ------------------------------------------------------------------------
+    # Define which channels appear in each "format"
     FORMAT_CHANNELS = {
-        "sRGB":  ["Red", "Green", "Blue"],
-        "HSV":  ["HSVHue", "HSVSaturation", "Value"],
-        "HSL":  ["HSLHue", "HSLSaturation", "HSLLightness"],
-        "CMYK": ["Cyan", "Magenta", "Yellow", "Key"],
-        "AdobeRGB": ["AdobeRed", "AdobeGreen", "AdobeBlue"],
-        "Pantone": ["PantoneColor"],
-        "LAB":  ["LABLightness", "LABA", "LABB"],
-        "XYZ":  ["XYZX", "XYZY", "XYZZ"],
-        "xyY":  ["xyYx", "xyYy", "xyYY"]
+        "HSV":         ["HSVHue", "HSVSaturation", "Value"],
+        "Pantone":     ["PantoneColor"],
+        "sRGB":        ["Red", "Green", "Blue"],
+        "Lab":         ["LABLightness", "LABA", "LABB"],
+        "AdobeRGB":    ["AdobeRed", "AdobeGreen", "AdobeBlue"],
+        "XYZ":         ["XYZX", "XYZY", "XYZZ"],
+        "xyY":         ["xyYx", "xyYy", "xyYY"],
+        "HSL":         ["HSLHue", "HSLSaturation", "HSLLightness"],
+        "CMYK":        ["Cyan", "Magenta", "Yellow", "Key"],
+        "Complements": ["Complementary"] 
     }
-
 
     def __init__(self, parent=None):
-        super().__init__(None)
+        super().__init__(parent)
         self.parent = parent
 
-        # For storing or toggling references
+        # Use a list for slider formats (instead of SLIDER_FORMAT_1 and SLIDER_FORMAT_2)
+        self.format_sections = Settings.get("SLIDER_FORMATS")
+        self.controls = {}  # will be keyed by (section_index, channel)
         self.history = None
         self.historyToggled = False
         self.lastMousePosition = None
 
-        # The two current color-format sections we’re displaying
-        self.format1 = Settings.get("SLIDER_FORMAT_1")
-        self.format2 = Settings.get("SLIDER_FORMAT_2")
+        self.initWindow()
+        self.initUI()
+        self.initConnections()
+        self.updateUI()
 
-        # We’ll store sliders/spinboxes in dictionaries keyed by (section, channel)
-        self.sliders = {}
-        self.spinboxes = {}
-
-        self.initializeWindow()
-        self.setupUI()
-        self.setupConnections()
-        self.updateAllUI()
-
-    # -----------------------------
-    # Window, connections, etc.
-    # -----------------------------
-    def initializeWindow(self):
-        """Initialize window properties and settings"""
+    # ------------------------------
+    # Window Setup
+    # ------------------------------
+    def initWindow(self):
         self.setStyleSheet(styles.DARK_STYLE)
-        self.setWindowFlags(self.WINDOW_FLAGS)
+        self.setWindowFlags(ColorPicker.WINDOW_FLAGS)
         self.setMouseTracking(True)
-        # For example, allow Preferred width and height
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
+        Settings.addListener("SET", "currentColor", self.updateUI)
+        Settings.addListener("SET", "FORMAT", self.updateColorPreview)
+        Settings.addListener("SET", "VALUE_ONLY", self.updateColorPreview)
 
-        # Subscribe to global color-changes
-        Settings.addListener("SET", "currentColor", self.updateAllUI)
-        Settings.addListener("SET", "FORMAT", self.updateColorPreviewStyle)
-        Settings.addListener("SET", "VALUE_ONLY", self.updateColorPreviewStyle)
+    # ------------------------------
+    # UI Construction
+    # ------------------------------
+    def initUI(self):
+        # Top-level layout with no margins.
+        mainLayout = QVBoxLayout(self)
+        mainLayout.setContentsMargins(0, 0, 0, 0)
+        mainLayout.setSpacing(0)
 
-    def setupConnections(self):
-        """Setup signal connections"""
-        self.saveShortcut = QShortcut(QKeySequence(self.SAVE_SHORTCUT), self)
+        # Header widget with title and window buttons.
+        headerWidget = self.createHeaderWidget()
+        mainLayout.addWidget(headerWidget)
+
+        # Content widget with padding for preview, HEX, and format sections.
+        contentWidget = QWidget(self)
+        contentLayout = QVBoxLayout(contentWidget)
+        contentLayout.setContentsMargins(10, 10, 10, 10)  # <-- Padding here
+
+        # Color preview area.
+        self.previewButton = QPushButton(objectName="ColorPreview")
+        self.previewButton.setFixedSize(275, 50)
+        contentLayout.addWidget(self.previewButton)
+
+        # HEX display and input.
+        contentLayout.addWidget(QLabel("HEX"))
+        self.hexEdit = QLineEdit()
+        contentLayout.addWidget(self.hexEdit)
+        self.hexEdit.installEventFilter(self)
+
+        # Container for dynamic format sections.
+        self.formatContainer = QVBoxLayout()
+        contentLayout.addLayout(self.formatContainer)
+
+        mainLayout.addWidget(contentWidget)
+        self.rebuildFormatSections()
+
+    def createHeaderWidget(self):
+        header = QWidget(self, objectName="TopBar")
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.arrowButton = QPushButton("◄", objectName="ArrowButton")
+        self.titleLabel = QLabel("TiinySwatch", objectName="TitleText", alignment=Qt.AlignCenter)
+        self.closeButton = QPushButton("X", objectName="CloseButton")
+        layout.addWidget(self.arrowButton)
+        layout.addWidget(self.titleLabel)
+        layout.addStretch()
+        layout.addWidget(self.closeButton)
+        return header
+
+    def rebuildFormatSections(self):
+        # Clear previous controls/layouts.
+        self.clearLayout(self.formatContainer)
+        self.controls.clear()
+
+        # Iterate over each format section in our list.
+        for index, fmt in enumerate(self.format_sections):
+            sectionLayout = QVBoxLayout()
+            sectionHeader = QHBoxLayout()
+            sectionHeader.setContentsMargins(0, 0, 0, 0)
+            # Format label button.
+            fmtButton = QPushButton(fmt, objectName="FormatLabel")
+            fmtButton.clicked.connect(partial(self.showFormatPopup, index))
+            fmtButton.setFixedSize(120, 20)
+            sectionHeader.addWidget(fmtButton)
+            sectionHeader.addStretch()
+            # Minus button for this section.
+            minusButton = QPushButton("–", self)
+            minusButton.setFixedSize(16, 16)
+            # Style it as a circle with white text.
+            minusButton.setStyleSheet(
+                "QPushButton { border: 1px solid #DDD; border-radius: 8px; color: #DDD; background: transparent; padding: none; text-align: center;}"
+                "QPushButton:hover { background-color: #444; }"
+            )
+            minusButton.clicked.connect(partial(self.removeFormat, index))
+            sectionHeader.addWidget(minusButton)
+            sectionLayout.addLayout(sectionHeader)
+
+            # Divider.
+            divider = QFrame()
+            divider.setFrameShape(QFrame.HLine)
+            divider.setFrameShadow(QFrame.Sunken)
+            sectionLayout.addWidget(divider)
+
+            # Build the control widgets for this format.
+            channelList = ColorPicker.FORMAT_CHANNELS.get(fmt, [])
+            controls = self.buildControlsForSection(index, channelList)
+            for ctrl in controls:
+                row = QHBoxLayout()
+                for widget in ctrl.widgets:
+                    row.addWidget(widget)
+                sectionLayout.addLayout(row)
+
+            self.formatContainer.addLayout(sectionLayout)
+
+        # If we have fewer than 4 format sections, add a plus button at the bottom.
+        if len(self.format_sections) < 4:
+            plusLayout = QHBoxLayout()
+            plusLayout.addStretch()
+            plusButton = QPushButton("+", self)
+            plusButton.setFixedSize(16, 16)
+            plusButton.setStyleSheet(
+                "QPushButton { border: 1px solid #DDD; border-radius: 8px; color: #DDD; background: transparent; padding: none; text-align: center }"
+                "QPushButton:hover { background-color: #444; }"
+            )
+            plusButton.clicked.connect(self.addFormat)
+            plusLayout.addWidget(plusButton)
+            self.formatContainer.addLayout(plusLayout)
+
+        # Force the overall widget to adopt a fixed size based on content.
+        self.layout().setSizeConstraint(QLayout.SetFixedSize)
+        self.adjustSize()
+        self.updateGeometry()
+        # Update the stored setting.
+        Settings.set("SLIDER_FORMATS", self.format_sections)
+
+    def clearLayout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                self.clearLayout(item.layout())
+                item.layout().deleteLater()
+
+    def buildControlsForSection(self, section_index, channel_list):
+        controls = []
+        for channel in channel_list:
+            if channel in COLOR_CONTROL_REGISTRY:
+                control = COLOR_CONTROL_REGISTRY[channel]()
+                control.create_widgets(self)
+                control.connect_signals(lambda val, s=section_index, ch=channel, ctrl=control: self.onControlValueChanged(s, ch, val, ctrl))
+                self.controls[(section_index, channel)] = control
+                controls.append(control)
+        return controls
+
+    # ------------------------------
+    # Format Modification Methods
+    # ------------------------------
+    def removeFormat(self, index):
+        # Remove the format section at the given index.
+        if 0 <= index < len(self.format_sections):
+            del self.format_sections[index]
+            self.rebuildFormatSections()
+            self.updateUI()
+
+    def addFormat(self):
+        # Build a menu of available formats (those not already in self.format_sections).
+        available = [fmt for fmt in ColorPicker.FORMAT_CHANNELS.keys() if fmt not in self.format_sections]
+        if not available:
+            return
+        menu = QMenu(self)
+        menu.setStyleSheet(styles.DARK_STYLE)
+        for fmt in available:
+            action = menu.addAction(fmt)
+            action.triggered.connect(partial(self.doAddFormat, fmt))
+        menu.exec_(QCursor.pos())
+
+    def doAddFormat(self, fmt):
+        # Add the selected format and rebuild.
+        self.format_sections.append(fmt)
+        self.rebuildFormatSections()
+        self.updateUI()
+
+    # ------------------------------
+    # Signal Handling & Updates (unchanged)
+    # ------------------------------
+    def initConnections(self):
+        self.saveShortcut = QShortcut(QKeySequence(ColorPicker.SAVE_SHORTCUT), self)
         self.saveShortcut.activated.connect(self.onSave)
-
         self.closeButton.clicked.connect(self.close)
-        self.arrowButton.clicked.connect(self.toggleHistoryWidget)
-        self.colorPreview.clicked.connect(ClipboardManager.copyCurrentColorToClipboard)
+        self.arrowButton.clicked.connect(self.toggleHistory)
+        self.previewButton.clicked.connect(ClipboardManager.copyCurrentColorToClipboard)
         self.hexEdit.textEdited.connect(self.onHexChanged)
+
+    def onControlValueChanged(self, section, channel, actual_value, control):
+        color = Settings.get("currentColor")
+        if not color.isValid():
+            color = QColorEnhanced()
+        new_color = color.clone()
+        control.set_value(new_color, actual_value)
+        Settings.set("currentColor", new_color)
+
+    def updateUI(self, *args):
+        color = Settings.get("currentColor")
+        if not color.isValid():
+            color = QColorEnhanced()
+        if not self.hexEdit.hasFocus():
+            self.hexEdit.blockSignals(True)
+            self.hexEdit.setText(color.name(QColor.HexRgb))
+            self.hexEdit.blockSignals(False)
+        for control in self.controls.values():
+            control.update_widgets(color)
+        self.updateColorPreview()
+
+    def updateColorPreview(self, *args):
+        currentColor = Settings.get("currentColor")
+        if not currentColor.isValid():
+            currentColor = QColorEnhanced()
+        hex_val = currentColor.name()
+        style = (
+            "QPushButton {"
+            f"  background-color: {hex_val};"
+            "  border: none;"
+            "  color: transparent;"
+            "}"
+            "QPushButton:hover {"
+            f"  background-color: {self.darkenColor(currentColor.qcolor, 30).name()};"
+            "  color: white;"
+            "}"
+            "QPushButton:pressed {"
+            f"  background-color: {self.darkenColor(currentColor.qcolor, 50).name()};"
+            "  border: 2px solid white;"
+            "}"
+        )
+        self.previewButton.setStyleSheet(style)
+        fmtFunc = ClipboardManager.getTemplate(Settings.get("FORMAT"))
+        self.previewButton.setText(fmtFunc(currentColor) if fmtFunc else "")
+
+    def darkenColor(self, color, amount=30):
+        h, s, v, a = color.getHsv()
+        v = max(0, v - amount)
+        return QColor.fromHsv(h, s, v, a)
+
+    def onHexChanged(self, text):
+        color = QColorEnhanced(QColor(text))
+        if color.isValid():
+            Settings.set("currentColor", color)
+
+    def onSave(self):
+        if self.history:
+            self.history.currentSelectedButton = len(Settings.get("colors"))
+        Settings.appendToHistory(Settings.get("currentColor").qcolor)
+
+    def toggleHistory(self):
+        if not self.history:
+            self.history = HistoryPalette(self)
+            self.history.show()
+            self.historyToggled = True
+        else:
+            self.historyToggled = not self.historyToggled
+            if self.historyToggled:
+                self.history.show()
+            else:
+                self.history.hide()
+
+    def showFormatPopup(self, section_index):
+        menu = QMenu(self)
+        menu.setStyleSheet(styles.DARK_STYLE)
+        current_fmt = self.format_sections[section_index]
+        for fmt in ColorPicker.FORMAT_CHANNELS.keys():
+            if fmt == current_fmt:
+                continue
+            action = menu.addAction(fmt)
+            action.triggered.connect(partial(self.onFormatChanged, section_index, fmt))
+        menu.exec_(QCursor.pos())
+
+    def onFormatChanged(self, section_index, new_fmt):
+        # If the new format is already in the list, swap with the current one.
+        if new_fmt in self.format_sections:
+            other_index = self.format_sections.index(new_fmt)
+            if other_index != section_index:
+                self.format_sections[other_index], self.format_sections[section_index] = (
+                    self.format_sections[section_index],
+                    self.format_sections[other_index]
+                )
+        else:
+            # Otherwise, simply assign the new format.
+            self.format_sections[section_index] = new_fmt
+        Settings.set("SLIDER_FORMATS", self.format_sections)
+        self.rebuildFormatSections()
+        self.updateUI()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -339,491 +359,10 @@ class ColorPicker(QWidget):
             self.parent.overlay = None
             self.parent.pickerToggled = False
 
-    # -----------------------------
-    # Building the UI
-    # -----------------------------
-    def setupUI(self):
-        """Initialize the user interface with layout placeholders"""
-        mainLayout = QVBoxLayout(self)
-        mainLayout.setContentsMargins(0, 0, 0, 0)
-
-        headerWidget = self.createHeaderWidget()
-        mainLayout.addWidget(headerWidget)
-
-        self.controlsLayout = QVBoxLayout()
-        self.controlsLayout.setContentsMargins(10, 10, 10, 10)
-
-        self.colorPreview = QPushButton(objectName="ColorPreview")
-        self.colorPreview.setFixedSize(275, 50)
-        self.controlsLayout.addWidget(self.colorPreview)
-
-        self.controlsLayout.addWidget(QLabel("HEX"))
-        self.controlsLayout.addWidget(self.createDivider())
-
-        self.hexEdit = QLineEdit()
-        self.controlsLayout.addWidget(self.hexEdit)
-        self.hexEdit.focusInEvent = self.onHexEditFocusIn
-        self.hexEdit.focusOutEvent = self.onHexEditFocusOut
-
-        self.formatContainer = QVBoxLayout()
-        self.controlsLayout.addLayout(self.formatContainer)
-
-        # Add all controls
-        mainLayout.addLayout(self.controlsLayout)
-
-        # Build out the initial dynamic sections
-        self.rebuildFormatSections()
-
-    def createHeaderWidget(self):
-        """Create the header widget with title and buttons"""
-        headerWidget = QWidget(self, objectName="TopBar")
-        headerLayout = QHBoxLayout(headerWidget)
-        headerLayout.setContentsMargins(0, 0, 0, 0)
-        headerLayout.setSpacing(0)
-
-        self.arrowButton = QPushButton("◄", objectName="ArrowButton")
-        self.titleText = QLabel("TiinySwatch", objectName="TitleText", alignment=Qt.AlignmentFlag.AlignCenter)
-        self.closeButton = QPushButton("X", objectName="CloseButton")
-
-        headerLayout.addWidget(self.arrowButton)
-        headerLayout.addWidget(self.titleText)
-        headerLayout.addStretch()
-        headerLayout.addWidget(self.closeButton)
-        return headerWidget
-
-    def createDivider(self):
-        """Create a horizontal dividing line"""
-        divider = QFrame()
-        divider.setFrameShape(QFrame.HLine)
-        divider.setFrameShadow(QFrame.Sunken)
-        return divider
-
-    # -----------------------------
-    # Dynamic format sections
-    # -----------------------------
-    def rebuildFormatSections(self):
-        # Clear any existing widgets/layouts in self.formatContainer.
-        self.clearLayout(self.formatContainer)
-
-        # Now rebuild sections:
-        self.buildFormatSection(self.format1, sectionIndex=1)
-        self.buildFormatSection(self.format2, sectionIndex=2)
-
-        # Force layout recalc
-        self.layout().invalidate()
-        self.layout().update()
-        self.layout().activate()
-
-        self.adjustSize()
-        self.updateGeometry()
-        
-
-    def clearLayout(self, layout):
-        """Recursively clear all items from the given layout."""
-        while layout.count():
-            item = layout.takeAt(0)
-            
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            else:
-                subLayout = item.layout()
-                if subLayout is not None:
-                    self.clearLayout(subLayout)
-                    # Optionally delete the sublayout itself:
-                    subLayout.deleteLater()
-
-
-    def buildFormatSection(self, formatName, sectionIndex):
-        """
-        Creates a vertical group:
-          - A clickable label (or button) that says the format (e.g. 'HSV')
-            with a popup to switch to a different format
-          - A divider
-          - The channel slider/spin pairs belonging to that format
-        """
-        formatLayout = QVBoxLayout()
-
-        formatButton = QPushButton(formatName, objectName="FormatLabel")
-        formatButton.clicked.connect(
-            lambda: self.showFormatPopup(sectionIndex)
-        )
-        formatLayout.addWidget(formatButton)
-        formatLayout.addWidget(self.createDivider())
-
-        if formatName == "Pantone":
-            # Create Pantone-specific UI
-            rowLayout = QHBoxLayout()
-            
-            # Color preview rectangle
-            pantonePreview = QFrame()
-            pantonePreview.setFixedSize(40, 25)
-            pantonePreview.setStyleSheet("background: gray; border: 1px solid #444;")
-            
-            # Text input
-            pantoneEdit = QLineEdit()
-            pantoneEdit.setPlaceholderText("Enter Pantone name")
-            
-            rowLayout.addWidget(pantonePreview)
-            rowLayout.addWidget(pantoneEdit)
-            formatLayout.addLayout(rowLayout)
-            
-            # Store references
-            self.sliders[(sectionIndex, "PantoneColor")] = pantonePreview
-            self.spinboxes[(sectionIndex, "PantoneColor")] = pantoneEdit
-
-            pantoneEdit.textEdited.connect(self.onPantoneChanged)
-        else:
-            if (formatName in self.FORMAT_CHANNELS): 
-                for channelName in self.FORMAT_CHANNELS[formatName]:
-                    rowLayout = QHBoxLayout()
-                    slider, spinbox = self.createChannelControls(
-                        channelName, sectionIndex
-                    )
-                    rowLayout.addWidget(slider)
-                    rowLayout.addWidget(spinbox)
-                    formatLayout.addLayout(rowLayout)
-
-        self.formatContainer.addLayout(formatLayout)
-
-    def showFormatPopup(self, sectionIndex):
-        """
-        Show a popup (QMenu) listing the available formats.
-        Choosing one will call onFormatChanged(sectionIndex, newFormat).
-        """
-        menu = QMenu()
-        menu.setStyleSheet(styles.DARK_STYLE)
-        for fmt in self.FORMAT_CHANNELS.keys():
-            if fmt == self.getFormat(sectionIndex):
-                continue  # skip adding the same format
-            action = menu.addAction(fmt)
-            action.triggered.connect(partial(self.onFormatChanged, sectionIndex, fmt))
-        # Display the menu under the mouse
-        menu.exec_(QCursor.pos())
-
-    def getFormat(self, sectionIndex):
-        """Return either self.format1 or self.format2 based on sectionIndex."""
-        if sectionIndex == 1:
-            return self.format1
-        else:
-            return self.format2
-
-    def setFormat(self, sectionIndex, formatName):
-        """Set either self.format1 or self.format2."""
-        if sectionIndex == 1:
-            self.format1 = formatName
-            Settings.set("SLIDER_FORMAT_1", formatName)
-        else:
-            self.format2 = formatName
-            Settings.set("SLIDER_FORMAT_2", formatName)
-
-    def onFormatChanged(self, sectionIndex, newFormat):
-        """
-        If the user picks a new format (e.g. CMYK) for sectionIndex,
-        we must:
-          - If the other section has that same format, swap them
-          - Otherwise, just set it
-          - Rebuild the UI
-        """
-        otherIndex = 1 if sectionIndex == 2 else 2
-        oldFormat = self.getFormat(sectionIndex)
-        otherFormat = self.getFormat(otherIndex)
-
-        if newFormat == otherFormat:
-            # Swap
-            self.setFormat(sectionIndex, otherFormat)
-            self.setFormat(otherIndex, oldFormat)
-        else:
-            # Just set it
-            self.setFormat(sectionIndex, newFormat)
-
-        # Rebuild
-        self.rebuildFormatSections()
-        self.updateAllUI()
-
-    # -----------------------------
-    # Creating channels (sliders)
-    # -----------------------------
-    def createChannelControls(self, channelName, sectionIndex):
-        """
-        Creates the QSlider + QSpinBox for a given channel in a given section.
-        Binds them so that changing one updates the other, and also updates the color.
-        We store references in self.sliders/spinboxes[(sectionIndex, channelName)].
-        """
-        if channelName == "PantoneColor":
-            return None, None
-
-        info = self.CHANNEL_INFO[channelName]
-        minVal, maxVal = info["sliderRange"]
-
-        if info.get("round") != None and info["round"] == False:
-            slider = QDoubleSlider(3, Qt.Horizontal)
-            spinbox = QDoubleSpinBox(decimals=3)
-            spinbox.setSingleStep(0.001)
-        else:
-            slider = QSlider(Qt.Horizontal)
-            spinbox = QSpinBox()
-
-        slider.setRange(minVal, maxVal)
-        spinbox.setRange(minVal, maxVal)
-
-        # Make sure we store them for later reference
-        self.sliders[(sectionIndex, channelName)] = slider
-        self.spinboxes[(sectionIndex, channelName)] = spinbox
-
-        # Connect signals
-        def onValueChanged(value):
-            self.synchronizeControls(slider, spinbox, value)
-            self.onChannelChanged(sectionIndex, channelName, value)
-
-        if info.get("round") != None and info["round"] == False:
-            slider.doubleValueChanged.connect(onValueChanged)
-        else:
-            slider.valueChanged.connect(onValueChanged)
-        spinbox.valueChanged.connect(onValueChanged)
-
-        return slider, spinbox
-
-    def onChannelChanged(self, sectionIndex, channelName, value):
-        """
-        When the user changes one channel (e.g., 'Red' = 128),
-        we read the current color, set the channel, then push back to Settings.
-        """
-        color = Settings.get("currentColor")
-        if not color.isValid():
-            color = QColorEnhanced(QColor(255,255,255))
-
-        # We mutate a copy, then push it back
-        newColor = color.clone()
-        # Use the 'set' lambda
-        sliderMin, sliderMax = self.CHANNEL_INFO[channelName]["sliderRange"]
-        actualMin, actualMax = self.CHANNEL_INFO[channelName]["actualRange"]
-
-        # Calculate the proportion of the slider value within its range
-        proportion = (value - sliderMin) / (sliderMax - sliderMin)
-
-        # Map this proportion to the actual range
-        actualValue = (proportion * (actualMax - actualMin)) + actualMin
-
-        self.CHANNEL_INFO[channelName]["set"](newColor, actualValue)
-
-        # Update the global color
-        Settings.set("currentColor", newColor)
-
-    def onPantoneChanged(self, text):
-        """Handle Pantone name input"""
-        color = Settings.get("currentColor")
-        color.setPantone(text.strip())
-        Settings.set("currentColor", color)
-
-
-    def synchronizeControls(self, slider, spinBox, value):
-        """Synchronize slider and spinbox values (blocking signals)."""
-        slider.blockSignals(True)
-        spinBox.blockSignals(True)
-        slider.setValue(value)
-        spinBox.setValue(value)
-        slider.blockSignals(False)
-        spinBox.blockSignals(False)
-
-    # -----------------------------
-    # Updating the UI (gradients, etc.)
-    # -----------------------------
-    def updateAllUI(self, *args):
-        """
-        Re-read the current color from settings and update:
-         - HEX text
-         - Each slider/spinbox
-         - Each slider's gradient
-         - Preview button style
-        """
-        color = Settings.get("currentColor")
-        if not color.isValid():
-            color = QColorEnhanced(QColor(255,255,255))
-
-        # Update HEX edit only if it's not focused
-        if not self.hexEdit.hasFocus():
-            self.hexEdit.blockSignals(True)
-            self.hexEdit.setText(color.name(QColor.HexRgb))
-            self.hexEdit.blockSignals(False)
-
-        # For each visible channel, sync the slider/spin with the new color
-        for key, slider in self.sliders.items():
-            
-            sectionIndex, channelName = key
-            # If the channel doesn't match the current format for that section, skip
-            activeChannels = self.FORMAT_CHANNELS[self.getFormat(sectionIndex)]
-            if channelName not in activeChannels:
-                continue
-
-            if channelName == "PantoneColor":
-                pantone_name = self.CHANNEL_INFO["PantoneColor"]["get"](color)
-                xyz_color = PantoneData.get_xyz(pantone_name)
-                if xyz_color:
-                    new_color = QColorEnhanced(QColor(255,255,255))
-                    new_color.setXYZ(xyz_color[0], xyz_color[1], xyz_color[2])
-                    spin = self.spinboxes[key]
-                    slider.setStyleSheet(f"background: {new_color.name()}; border: 1px solid #444;")
-                    if not spin.hasFocus():
-                        spin.setText(pantone_name or "")
-                continue
-
-            info = self.CHANNEL_INFO[channelName]
-            val = info["get"](color)
-            spin = self.spinboxes[key]
-            sliderValue = self.actualToSlider(channelName, val)
-            self.synchronizeControls(slider, spin, sliderValue)
-
-            # Update slider style (gradient)
-            style = self.generateSliderGradient(channelName, color)
-            slider.setStyleSheet(style)
-
-        # Update color preview
-        self.updateColorPreviewStyle()
-
-    def actualToSlider(self, channel_name, actualValue):
-        # Extract ranges from CHANNEL_INFO
-        actualMin, actualMax = self.CHANNEL_INFO[channel_name]["actualRange"]
-        sliderMin, sliderMax = self.CHANNEL_INFO[channel_name]["sliderRange"]
-        
-        # Calculate the proportion of the actual value within its range
-        proportion = (actualValue - actualMin) / (actualMax - actualMin)
-        
-        # Optional: Clamp proportion between 0 and 1 to handle out-of-range values
-        proportion = max(0.0, min(1.0, proportion))
-        
-        # Map this proportion to the slider range
-        sliderValueFloat = proportion * (sliderMax - sliderMin) + sliderMin
-        
-        # Since slider value must be an integer, round
-        if self.CHANNEL_INFO[channel_name].get("round") != None and self.CHANNEL_INFO[channel_name]["round"] == False:
-            sliderValue = sliderValueFloat
-        else:
-            sliderValue = int(sliderValueFloat)
-        
-        # Ensure slider_value is within slider bounds after rounding
-        sliderValue = max(sliderMin, min(sliderMax, sliderValue))
-        
-        return sliderValue
-
-    def onHexEditFocusIn(self, event):
-        """Handle focus in event for hexEdit."""
-        self.hexEdit.setStyleSheet(
-            """
-            QLineEdit {
-                border: 1px solid #7b6cd9;
-                padding: 4px;
-            }
-            """
-        )
-        QLineEdit.focusInEvent(self.hexEdit, event)
-
-    def onHexEditFocusOut(self, event):
-        """Handle focus out event for hexEdit."""
-        self.hexEdit.setStyleSheet(
-            """
-            QLineEdit {
-                border: 1px solid gray;
-                padding: 4px;
-            }
-            """
-        )
-        QLineEdit.focusOutEvent(self.hexEdit, event)
-
-    def generateSliderGradient(self, channelName, baseColor):
-        """
-        Dynamically build a qlineargradient with multiple stops from min->max
-        for the given channel, while all other channels remain as in baseColor.
-        Return a fully formatted stylesheet string containing both the gradient
-        and handleColor.
-        """
-        info = self.CHANNEL_INFO[channelName]
-        steps = info["steps"]
-        (minVal, maxVal) = info["actualRange"]
-        setFn = info["set"]
-
-        colorStops = []
-        for i in range(steps + 1):
-            fraction = i / float(steps)
-            testVal = minVal + fraction * (maxVal - minVal)
-
-            c = baseColor.clone()  # copy so we don't mutate original
-            setFn(c, testVal)
-            colorStops.append((fraction, c.name()))
-
-        # Build qlineargradient string
-        stopsStr = ", ".join(f"stop:{frac:.2f} {col}" for (frac, col) in colorStops)
-        gradientCss = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, {stopsStr})"
-
-        # Return a fully formatted template
-        return self.BASE_SLIDER_TEMPLATE.format(
-            gradient=gradientCss,
-            handleColor=baseColor.name()
-        )
-
-    def updateColorPreviewStyle(self, _=None):
-        """Update the color preview button style from the current color."""
-        currentColor = Settings.get("currentColor")
-        if not currentColor.isValid():
-            currentColor = QColorEnhanced(QColor(255,255,255))
-        hexValue = currentColor.name()
-
-        style = (
-            "QPushButton {\n"
-            f"  background-color: {hexValue};\n"
-            "  border: none;\n"
-            "  color: transparent;\n"
-            "}\n"
-            "QPushButton:hover {\n"
-            f"  background-color: {self.darkenColor(currentColor.qcolor, 30).name()};\n"
-            "  color: white;\n"
-            "}\n"
-            "QPushButton:pressed {\n"
-            f"  background-color: {self.darkenColor(currentColor.qcolor, 50).name()};\n"
-            "  border: 2px solid white;\n"
-            "}\n"
-        )
-
-        self.colorPreview.setStyleSheet(style)
-
-        fmtFunc = ClipboardManager.getTemplate(Settings.get("FORMAT"))
-        if fmtFunc:
-            self.colorPreview.setText(fmtFunc(currentColor))
-        else:
-            self.colorPreview.setText("")
-
-    def darkenColor(self, color, amount=30):
-        """Darken a color by a certain amount on the Value channel of HSV."""
-        h, s, v, a = color.getHsv()
-        v = max(0, v - amount)
-        darker = QColor.fromHsv(h, s, v, a)
-        return darker
-
-    # -----------------------------
-    #  Hex editing
-    # -----------------------------
-    def onHexChanged(self, text):
-        color = QColorEnhanced(QColor(text))
-        if color.isValid():
-            Settings.set("currentColor", color)
-
-    # -----------------------------
-    #  History and saving
-    # -----------------------------
-    def onSave(self):
-        if self.history:
-            self.history.currentSelectedButton = len(Settings.get("colors"))
-        Settings.appendToHistory(Settings.get("currentColor").qcolor)
-
-    def toggleHistoryWidget(self):
-        """Toggle the history palette visibility"""
-        if not self.history:
-            self.history = HistoryPalette(self)
-            self.history.show()
-            self.historyToggled = True
-        else:
-            self.historyToggled = not self.historyToggled
-            if self.historyToggled:
-                self.history.show()
-            else:
-                self.history.hide()
+    def eventFilter(self, obj, event):
+        if obj == self.hexEdit:
+            if event.type() == QEvent.FocusIn:
+                self.hexEdit.setStyleSheet("QLineEdit { border: 1px solid #7b6cd9; padding: 4px; }")
+            elif event.type() == QEvent.FocusOut:
+                self.hexEdit.setStyleSheet("QLineEdit { border: 1px solid gray; padding: 4px; }")
+        return super().eventFilter(obj, event)
