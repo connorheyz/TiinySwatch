@@ -11,11 +11,12 @@ Toggle Palette Keybind: f4
 Auto Copy To Clipboard: True
 ```
 Additionally, you can perform the following actions:
- - Pressing Ctrl+S while on the color picker will save the current color to the history palette.
- - Pressing delete on a color in the palette will remove it.
+ - Pressing Ctrl+S while on the color picker will save the current colors to the history palette.
+ - Pressing delete on a color in the palette or in the picker will remove it.
  - You can navigate through the color palette by clicking or using the arrow keys.
  - Clicking on the RGB or HSV tabs in the color picker will allow you to change the color format.
  - The export button in the history palette exports to Paint.NET's palette format.
+ - Ctrl or shift clicking in the history palette allows you to select multiple colors for picking. Some tools, like "Linear Gradient", make use of multiple color selections.
 # Building From Source
 
 The following runs the program using python:
