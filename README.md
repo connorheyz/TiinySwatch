@@ -2,7 +2,7 @@
 
 ![alt text](screenshot.png "Title")
 
-TiinySwatch will appear in your system tray as a single colored block. Left clicking the tray icon pulls up a color picker menu. Right clicking the tray icon pulls up the settings, where you can set keybinds. The default settings are as follows:
+TiinySwatch will appear in your system tray as a single colored block. Left clicking the tray icon pulls up a color picker menu. Right clicking the tray icon pulls up the settings, where you can set keybinds and other options. The default settings are as follows:
 ```
 Clipboard Format: Hexadecimal
 Screen Capture Keybind: f2
@@ -17,6 +17,9 @@ Additionally, you can perform the following actions:
  - Clicking on the RGB or HSV tabs in the color picker will allow you to change the color format.
  - The export button in the history palette exports to Paint.NET's palette format.
  - Ctrl or shift clicking in the history palette allows you to select multiple colors for picking. Some tools, like "Linear Gradient", make use of multiple color selections.
+# Pre-built Windows 11 x86-64 Binary
+The `dist/` folder contains a pre-built .exe for Windows 11 machines.
+
 # Building From Source
 
 The following runs the program using python:
