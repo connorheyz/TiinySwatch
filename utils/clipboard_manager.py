@@ -1,75 +1,159 @@
 from PySide6.QtWidgets import QApplication
 from utils import Settings
-from .color_utils import QColorEnhanced
+from color import QColorEnhanced
+from .notification_manager import NotificationManager, NotificationType
+
+def map_value(value, source_range, target_range):
+    """Linearly map value from source_range to target_range and round."""
+    src_min, src_max = source_range if source_range else (0, 1)
+    tgt_min, tgt_max = target_range
+    # Avoid division by zero
+    if src_max - src_min == 0:
+        return round(value)
+    mapped = (value - src_min) / (src_max - src_min) * (tgt_max - tgt_min) + tgt_min
+    return round(mapped)
+
+def format_color_generic(color, config):
+    """
+    Generic helper that formats a QColorEnhanced instance according to
+    the provided config. If a custom formatter is provided, it is used directly.
+    Otherwise, the color values are retrieved via the given color space,
+    mapped to the target ranges (or simply rounded if no target_ranges is provided),
+    and substituted into the template.
+    """
+    # Use custom formatter if available.
+    if "formatter" in config:
+        return config["formatter"](color)
+    
+    space = config["space"]
+    template = config["template"]
+    # Retrieve the values as a tuple (order must match template placeholders).
+    values = color.getTuple(space)
+    
+    target_ranges = config.get("target_ranges")
+    source_ranges = list(QColorEnhanced.getRange(space).values())
+    
+    if target_ranges is not None:
+        scaled_values = []
+        for i, value in enumerate(values):
+            # If a source range is provided for this component, use it; otherwise assume (0, 1).
+            src_range = source_ranges[i] if (source_ranges and i < len(source_ranges)) else (0.0, 1.0)
+            tgt_range = target_ranges[i]
+            scaled_values.append(map_value(value, src_range, tgt_range))
+    else:
+        # If no target_ranges, just round the values.
+        scaled_values = [round(v, 3) for v in values]
+    
+    return template.format(*scaled_values)
+
+COLOR_FORMAT_CONFIG = {
+    "HEX": {
+        "full": {"formatter": lambda color: color.name()},
+        "value_only": {"formatter": lambda color: color.name()},
+    },
+    "RGB": {
+        "full": {
+            "space": "srgb",
+            "template": "rgb({0}, {1}, {2})",
+            "target_ranges": ((0, 255), (0, 255), (0, 255)),
+        },
+        "value_only": {
+            "space": "srgb",
+            "template": "{0}, {1}, {2}",
+            "target_ranges": ((0, 255), (0, 255), (0, 255)),
+        },
+    },
+    "HSV": {
+        "full": {
+            "space": "hsv",
+            "template": "hsv({0}, {1}%, {2}%)",
+            "target_ranges": ((0, 360), (0, 100), (0, 100)),
+        },
+        "value_only": {
+            "space": "hsv",
+            "template": "{0}, {1}%, {2}%",
+            "target_ranges": ((0, 360), (0, 100), (0, 100)),
+        },
+    },
+    "HSL": {
+        "full": {
+            "space": "hsl",
+            "template": "hsl({0}, {1}%, {2}%)",
+            "target_ranges": ((0, 360), (0, 100), (0, 100)),
+        },
+        "value_only": {
+            "space": "hsl",
+            "template": "{0}, {1}%, {2}%",
+            "target_ranges": ((0, 360), (0, 100), (0, 100)),
+        },
+    },
+    "CMYK": {
+        "full": {
+            "space": "cmyk",
+            "template": "cmyk({0}%, {1}%, {2}%, {3}%)",
+            "target_ranges": ((0, 100), (0, 100), (0, 100), (0, 100)),
+        },
+        "value_only": {
+            "space": "cmyk",
+            "template": "{0}%, {1}%, {2}%, {3}%",
+            "target_ranges": ((0, 100), (0, 100), (0, 100), (0, 100)),
+        },
+    },
+    "LAB": {
+        "full": {
+            "space": "lab",
+            "template": "lab({0}, {1}, {2})",
+            "target_ranges": None,
+        },
+        "value_only": {
+            "space": "lab",
+            "template": "{0}, {1}, {2}",
+            "target_ranges": None,
+        },
+    },
+}
 
 class ClipboardManager:
-
-    # Define all templates in a nested dictionary for easier access
-    COLOR_FORMAT_TEMPLATES = {
-        "HEX": {
-            "full": lambda color: color.name(),
-            "value_only": lambda color: color.name(),
-        },
-        "RGB": {
-            "full": lambda color: f"rgb({color.red()}, {color.green()}, {color.blue()})",
-            "value_only": lambda color: f"{color.red()}, {color.green()}, {color.blue()}",
-        },
-        "HSV": {
-            "full": lambda color: f"hsv({color.hsvHue()}, {int((color.hsvSaturation()/255.0) * 100)}%, {int((color.value()/255.0) * 100)}%)",
-            "value_only": lambda color: f"{color.hsvHue()}, {int((color.hsvSaturation()/255.0) * 100)}%, {int((color.value()/255.0) * 100)}%",
-        },
-        "HSL": {
-            "full": lambda color: f"hsl({color.hslHue()}, {int((color.hslSaturation()/255.0) * 100)}%, {int((color.lightness()/255.0) * 100)}%)",
-            "value_only": lambda color: f"{color.hslHue()}, {int((color.hslSaturation()/255.0) * 100)}, {int((color.lightness()/255.0) * 100)}%",
-        },
-        "CMYK": {
-            "full": lambda color: f"cmyk({int((color.cyan()/255.0) * 100)}%, {int((color.magenta()/255.0) * 100)}%, {int((color.yellow()/255.0) * 100)}%, {int((color.black()/255.0) * 100)}%)",
-            "value_only": lambda color: f"{int((color.cyan()/255.0) * 100)}%, {int((color.magenta()/255.0) * 100)}%, {int((color.yellow()/255.0) * 100)}%, {int((color.black()/255.0) * 100)}%",
-        },
-        "LAB": {
-            "full": lambda color: f"lab({int(color.getLab()['L'])}, {int(color.getLab()['a'])}, {int(color.getLab()['b'])})",
-            "value_only": lambda color: f"{int(color.getLab()['L'])}, {int(color.getLab()['a'])}, {int(color.getLab()['b'])}",
-        }
-    }
+    COLOR_FORMAT_CONFIG = COLOR_FORMAT_CONFIG
 
     @classmethod
     def getTemplate(cls, format_type: str):
         value_only = Settings.get("VALUE_ONLY")
+        key = "value_only" if value_only else "full"
         try:
-            key = "value_only" if value_only else "full"
-            return cls.COLOR_FORMAT_TEMPLATES[format_type][key]
+            return cls.COLOR_FORMAT_CONFIG[format_type][key]
         except KeyError:
             raise ValueError(f"Unsupported format type '{format_type}' or key '{key}'.")
 
     @classmethod
-    def getFormattedColor(cls, color):
+    def getFormattedColor(cls, color, format_type=None):
         if not isinstance(color, QColorEnhanced):
             color = QColorEnhanced(color)
-        format_type = Settings.get("FORMAT")
-        
-        # Retrieve the appropriate template using the getTemplate method
-        template = cls.getTemplate(format_type)
-        return template(color)
+        if format_type == None:
+            format_type = Settings.get("FORMAT")
+        config = cls.getTemplate(format_type)
+        return format_color_generic(color, config)
     
     @classmethod
     def copyColorsToClipboard(cls, indices):
         clipboard = QApplication.clipboard()
         colors = Settings.get("colors")
-
         clipboard_strings = []
-
-        for i in range(len(colors)):
+        for i, color in enumerate(colors):
             if i in indices:
-                clipboard_strings.append(cls.getFormattedColor(colors[i]))
-
+                clipboard_strings.append(cls.getFormattedColor(color))
         clipboard.setText("\n".join(clipboard_strings))
+        NotificationManager.notify("Colors copied to clipboard!", NotificationType.OK)
+
+    @classmethod 
+    def copyColorToClipboard(cls, color):
+        clipboard = QApplication.clipboard()
+        formatted_color = cls.getFormattedColor(color)
+        clipboard.setText(formatted_color)
+        NotificationManager.notify("Color copied to clipboard!", NotificationType.OK)
 
     @classmethod
-    def copyCurrentColorToClipboard(cls):
-        """Copy the current color to clipboard in the selected format."""
+    def copyTextToClipboard(cls, text):
         clipboard = QApplication.clipboard()
-        current_color = Settings.get("currentColor")
-        
-        formatted_color = cls.getFormattedColor(current_color)
-
-        clipboard.setText(formatted_color)
+        clipboard.setText(text)
+        NotificationManager.notify("Text copied to clipboard!", NotificationType.OK)

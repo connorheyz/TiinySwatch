@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt, QRect
 from PySide6.QtWidgets import QApplication, QDialog
 from PySide6.QtGui import QPainter, QCursor, QColor
 from utils import Settings, ClipboardManager
+from color import QColorEnhanced
 import styles
 
 class TransparentOverlay(QDialog):
@@ -49,10 +50,11 @@ class TransparentOverlay(QDialog):
             # Calculate average color
             self.calculateAverageColor()
             if self.averageColor:
-                Settings.set("currentColor", self.averageColor)
-                Settings.appendToHistory(Settings.get("currentColor").qcolor)
-                if Settings.get("CLIPBOARD"):
-                    ClipboardManager.copyCurrentColorToClipboard()
+                Settings.set("currentColors", [QColorEnhanced(self.averageColor)])
+                for color in Settings.get("currentColors"):
+                    Settings.appendToHistory(color)
+                    if Settings.get("CLIPBOARD"):
+                        ClipboardManager.copyColorToClipboard(color)
             self.close()
         else:
             super().mouseReleaseEvent(event)

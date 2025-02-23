@@ -1,11 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('utils/pantone-xyz-colors.json', 'utils')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QMenu, QInputDialog
-from PySide6.QtGui import QAction, QActionGroup, QColor
+from PySide6.QtGui import QAction, QActionGroup
 from utils import Settings, ClipboardManager
+from color import QColorEnhanced
 
 CHANGE_KEYBIND_TITLE = "Change Keybind"
 CHANGE_KEYBIND_PROMPT = "Enter the new key:"
@@ -21,7 +22,7 @@ class SettingsMenu(QMenu):
         self.setTitle("TiinySwatch v1.0")
 
         # Listen for color changes so we can update the format action text
-        Settings.addListener("SET", "currentColor", self.updateColorActions)
+        Settings.addListener("SET", "currentColors", self.updateColorActions)
         Settings.addListener("SET", "VALUE_ONLY", self.updateColorActions)
 
         # Build the menu in sections
@@ -111,6 +112,12 @@ class SettingsMenu(QMenu):
         self.formatActionGroup.addAction(self.cmykAction)
         self.addAction(self.cmykAction)
 
+        # LAB Action
+        self.labAction = QAction("LAB", self, checkable=True)
+        self.labAction.triggered.connect(lambda checked: self.onFormatSelected("LAB") if checked else None)
+        self.formatActionGroup.addAction(self.labAction)
+        self.addAction(self.labAction)
+
     def initExitAction(self):
         """
         Create and add the 'Exit' action at the bottom of the menu.
@@ -143,11 +150,8 @@ class SettingsMenu(QMenu):
         in that format to the clipboard (if there's a current color).
         """
         Settings.set("FORMAT", formatStr)
-        currentColor = Settings.get("currentColor")
-        if currentColor is not None:
-            # If auto-paste is enabled, copy it now
-            if Settings.get("CLIPBOARD"):
-                ClipboardManager.copyCurrentColorToClipboard()
+        if Settings.get("CLIPBOARD"):
+            ClipboardManager.copyColorToClipboard(Settings.getCurrentColor())
 
     # ------------------------------------------------------------------
     #                          Utility
@@ -165,25 +169,29 @@ class SettingsMenu(QMenu):
             self.hslAction.setChecked(True)
         elif currentFormat == "CMYK":
             self.cmykAction.setChecked(True)
+        elif currentFormat == "LAB":
+            self.labAction.setChecked(True)
 
     def updateColorActions(self, _):
         """
         Update the text for RGB, HEX, and HSV actions based on the current color in Settings.
         This method is called whenever 'currentColor' changes via Settings.addListener.
         """
-        color = Settings.get("currentColor")
-        if color is None:
-            color = QColor(255, 255, 255)  # fallback
+        colors = Settings.get("currentColors")
+        if len(colors) < 1:
+            colors = [QColorEnhanced(255, 255, 255)]  # fallback
 
         # Generate text from ClipboardManager's format templates
-        rgbText = ClipboardManager.getTemplate("RGB")(color) + " (rgb)"
-        hexText = ClipboardManager.getTemplate("HEX")(color) + " (hex)"
-        hsvText = ClipboardManager.getTemplate("HSV")(color) + " (hsv)"
-        hslText = ClipboardManager.getTemplate("HSL")(color) + " (hsl)"
-        cmykText = ClipboardManager.getTemplate("CMYK")(color) + " (cmyk)"
+        rgbText = ClipboardManager.getFormattedColor(colors[0], "RGB") + " (rgb)"
+        hexText = ClipboardManager.getFormattedColor(colors[0], "HEX") + " (hex)"
+        hsvText = ClipboardManager.getFormattedColor(colors[0], "HSV") + " (hsv)"
+        hslText = ClipboardManager.getFormattedColor(colors[0], "HSL") + " (hsl)"
+        cmykText = ClipboardManager.getFormattedColor(colors[0], "CMYK") + " (cmyk)"
+        labText = ClipboardManager.getFormattedColor(colors[0], "LAB") + " (lab)"
 
         self.rgbAction.setText(rgbText)
         self.hexAction.setText(hexText)
         self.hsvAction.setText(hsvText)
         self.hslAction.setText(hslText)
         self.cmykAction.setText(cmykText)
+        self.labAction.setText(labText)

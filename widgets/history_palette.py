@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QEvent, QRect
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QGridLayout, QLabel, QSpacerItem, QSizePolicy, QHBoxLayout,
     QPushButton, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QApplication
@@ -153,8 +153,22 @@ class HistoryPalette(QWidget):
 
         self.selectedIndices = new_selected
         self.currentSelectedButton = index
-        Settings.set("currentColor", colors[index])
+        Settings.set("currentColors", self.getColors(new_selected))
+        if Settings.get("CLIPBOARD"):
+            self.copyCurrentColors()
         self.updateColors()
+
+    def getColors(self, indices):
+        colors = Settings.get("colors", [])
+        selectedColors = []
+        if not colors:
+            return
+        
+        for i in indices:
+            selectedColors.append(colors[i].clone())
+
+        return selectedColors
+
 
     def moveSelection(self, step):
         colors = Settings.get("colors", [])
@@ -179,7 +193,7 @@ class HistoryPalette(QWidget):
             self.anchorIndex = new_index
 
         self.currentSelectedButton = new_index
-        Settings.set("currentColor", colors[new_index])
+        Settings.set("currentColors", [colors[new_index]])
         self.updateColors()
 
     def handleDeleteKey(self):

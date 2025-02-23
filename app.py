@@ -1,8 +1,8 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon
 from PySide6.QtGui import (QIcon, QPixmap, QPainter, QCursor, QGuiApplication, 
-                          QBrush)
-from utils import Settings, KeybindManager, PantoneData
+                          QBrush, QColor)
+from utils import Settings, KeybindManager, PantoneData, NotificationManager
 from dialogs import TransparentOverlay
 from widgets import ColorPicker
 from menus import SettingsMenu
@@ -23,8 +23,9 @@ class App(QMainWindow):
         super().__init__()
         Settings.load()
         self.keybindManager = KeybindManager.initialize(self)
-        PantoneData.generate_xyz_json()
         PantoneData.initialize()
+        NotificationManager.initialize()
+
         self.colorPicker = None
         self.overlay = None
         self.pickerToggled = False
@@ -42,7 +43,8 @@ class App(QMainWindow):
         
         # Setup system tray
         self.trayIcon = QSystemTrayIcon(self)
-        self.trayIcon.setIcon(self.createColoredIcon(Settings.get("currentColor").qcolor))
+
+        self.trayIcon.setIcon(self.createColoredIcon(Settings.getCurrentColor()))
         self.trayIcon.activated.connect(self.onTrayActivation)
         
         self.setupTrayMenu()
@@ -53,7 +55,8 @@ class App(QMainWindow):
         self.toggleOverlaySignal.connect(self.toggleColorPick)
         self.toggleColorPickerSignal.connect(self.toggleColorPicker)
         self.toggleHistoryWidgetSignal.connect(self.toggleHistoryWidget)
-        Settings.addListener("SET", "currentColor", self.updateColorInfo)
+        Settings.addListener("SET", "currentColors", self.updateColorInfo)
+        Settings.addListener("SET", "selectedIndex", self.updateColorInfo)
 
     def setupHotkeys(self):
         """Setup keyboard shortcuts"""
@@ -89,11 +92,12 @@ class App(QMainWindow):
     def toggleHistoryWidget(self):
         """Toggle the color history widget"""
         if self.colorPicker:
-            self.colorPicker.toggleHistoryWidget()
+            self.colorPicker.toggleHistory()
 
-    def updateColorInfo(self, color):
+    def updateColorInfo(self, _color):
         # Update tray icon
-        self.trayIcon.setIcon(self.createColoredIcon(color.qcolor))
+        color = Settings.getCurrentColor()
+        self.trayIcon.setIcon(self.createColoredIcon(color))
 
     def toggleColorPick(self):
         """Start the color picking process"""
@@ -119,7 +123,7 @@ class App(QMainWindow):
         """Create a colored icon for the system tray"""
         pixmap = QPixmap(self.ICON_SIZE, self.ICON_SIZE)
         painter = QPainter(pixmap)
-        painter.fillRect(0, 0, self.ICON_SIZE, self.ICON_SIZE, QBrush(color))
+        painter.fillRect(0, 0, self.ICON_SIZE, self.ICON_SIZE, QBrush(color.qcolor))
         painter.end()
         return QIcon(pixmap)
 

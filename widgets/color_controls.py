@@ -1,218 +1,157 @@
-from functools import partial
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QFrame, QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLayout
-from .q_double_slider import QDoubleSlider
-from utils import Settings
+from PySide6.QtWidgets import QSpinBox, QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLayout, QSizePolicy
+from .color_widgets import ClickableLineEdit, ColorBlock, ExpandableColorBlocksWidget, SliderSpinBoxPair, LineEdit
+from utils import ClipboardManager
+from color import QColorEnhanced, ColorArc, ColorArcSingular
+import numpy as np
+import math
+
+
+# --- Base Color Control ---
 
 class ColorControl:
     """
     Base class for a color control.
-
-    Subclasses must implement:
-      - create_widgets(parent): Create and return a list of widget(s) for this control.
-      - update_widgets(color): Update the widgets based on the given color.
-      - connect_signals(on_value_changed): Connect widget signals so that on_value_changed(new_actual_value)
-            is called when a change occurs.
-      - get_value(color): Extract the actual value for this control from the color.
-      - set_value(color, value): Update the color with the new actual value.
-
-    Also provides helper methods for converting between “actual” and UI values.
+    
+    Subclasses must implement create_widgets(), update_widgets(), get_value(), and set_value().
     """
     def __init__(self, name, actual_range, ui_range, steps=10, decimals=None):
         self.name = name
-        self.actual_range = actual_range  # e.g. (0, 359)
-        self.ui_range = ui_range          # e.g. (0, 359) for a slider
-        self.steps = steps                # For gradient generation
-        self.decimals = decimals          # If not None, use floating-point widgets
-        self.widgets = []                 # List of widgets created for this control
+        self.actual_range = actual_range
+        self.ui_range = ui_range
+        self.steps = steps
+        self.decimals = decimals
+        self.widgets = []
         self.on_value_changed_callback = None
+        self.use_single = True
 
     def create_widgets(self, parent: QWidget):
-        """Create and return a list of widget(s)."""
         raise NotImplementedError
 
     def update_widgets(self, color):
-        """
-        Update the widget(s) with the current value (and update any dynamic style, such as gradients)
-        based on the provided color.
-        """
         raise NotImplementedError
 
     def connect_signals(self, on_value_changed):
-        """
-        Connect widget signals so that when a value changes, on_value_changed(new_actual_value) is called.
-        """
         self.on_value_changed_callback = on_value_changed
-        raise NotImplementedError
 
     def get_value(self, color):
-        """Extract this control’s value from the color."""
         raise NotImplementedError
 
     def set_value(self, color, value):
-        """Set this control’s value on the color."""
         raise NotImplementedError
 
-    def actual_to_ui(self, actual_value):
-        """Convert an actual value to the widget (UI) value."""
-        a_min, a_max = self.actual_range
-        ui_min, ui_max = self.ui_range
-        proportion = (actual_value - a_min) / (a_max - a_min)
-        ui_value = proportion * (ui_max - ui_min) + ui_min
-        return int(round(ui_value)) if self.decimals is None else ui_value
 
-    def ui_to_actual(self, ui_value):
-        """Convert a widget (UI) value to an actual value."""
-        a_min, a_max = self.actual_range
-        ui_min, ui_max = self.ui_range
-        proportion = (ui_value - ui_min) / (ui_max - ui_min)
-        return proportion * (a_max - a_min) + a_min
+# --- Example Control Implementations ---
 
-    def generate_slider_gradient(self, base_color, set_fn):
-        """
-        Generate a QSS gradient string based on varying this channel in base_color.
-        The set_fn should be a function that, given a color object and a value,
-        updates that channel on the color.
-        """
-        stops = []
-        for i in range(self.steps + 1):
-            fraction = i / float(self.steps)
-            test_val = self.actual_range[0] + fraction * (self.actual_range[1] - self.actual_range[0])
-            c = base_color.clone()  # Assumes your color class has a clone() method.
-            set_fn(c, test_val)
-            stops.append((fraction, c.name()))
-        stops_str = ", ".join(f"stop:{frac:.2f} {col}" for (frac, col) in stops)
-        gradient_css = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, {stops_str})"
-        style = f"""
-            QSlider::groove:horizontal {{
-                background: {gradient_css};
-            }}
-            QSlider::handle:horizontal {{
-                background-color: {base_color.name()};
-            }}
-        """
-        return style
-
-
-# ---------------------------
-# A Default (Slider/Spinbox) Control
-# ---------------------------
 class PairControl(ColorControl):
     """
-    Default control using two widgets (e.g. a slider and a spinbox). Assumes the first widget is the slider.
+    A default control that uses a SliderSpinBoxPair.
     """
     def create_widgets(self, parent: QWidget):
-        if self.decimals is not None:
-            slider = QDoubleSlider(self.decimals, Qt.Horizontal, parent)
-            spinbox = QDoubleSpinBox(parent)
-            spinbox.setDecimals(self.decimals)
-            spinbox.setSingleStep(10 ** (-self.decimals))
-        else:
-            slider = QSlider(Qt.Horizontal, parent)
-            spinbox = QSpinBox(parent)
-        ui_min, ui_max = self.ui_range
-        slider.setRange(ui_min, ui_max)
-        spinbox.setRange(ui_min, ui_max)
-        self.widgets = [slider, spinbox]
+        self.slider_pair = SliderSpinBoxPair(
+            actual_range=self.actual_range,
+            ui_range=self.ui_range,
+            steps=self.steps,
+            decimals=self.decimals,
+            parent=parent
+        )
+        self.widgets = [self.slider_pair]
         return self.widgets
 
     def update_widgets(self, color):
-        """Update both the numeric value and the slider gradient based on the current color."""
         actual = self.get_value(color)
-        ui_val = self.actual_to_ui(actual)
-        # Update numeric value in all widgets.
-        for widget in self.widgets:
-            widget.blockSignals(True)
-            widget.setValue(ui_val)
-            widget.blockSignals(False)
-        # Also update the slider's gradient style.
-        slider = self.widgets[0]
-        slider.setStyleSheet(self.generate_slider_gradient(color, self.set_value))
+        self.slider_pair.set_value(actual)
+        self.slider_pair.set_slider_gradient(color, self.set_value)
 
     def connect_signals(self, on_value_changed):
-        self.on_value_changed_callback = on_value_changed
-        slider = self.widgets[0]
-        if hasattr(slider, 'doubleValueChanged'):
-            slider.doubleValueChanged.connect(lambda v: on_value_changed(self.ui_to_actual(v)))
-        else:
-            slider.valueChanged.connect(lambda v: on_value_changed(self.ui_to_actual(v)))
-        for widget in self.widgets[1:]:
-            if hasattr(widget, 'doubleValueChanged'):
-                widget.doubleValueChanged.connect(lambda v: on_value_changed(self.ui_to_actual(v)))
-            else:
-                widget.valueChanged.connect(lambda v: on_value_changed(self.ui_to_actual(v)))
+        self.slider_pair.valueChanged.connect(on_value_changed)
 
+def create_slider_class(fmt: str, comp: str, ui_range: tuple, actual_range: tuple, steps: int = 10):
+    """
+    Dynamically creates a PairControl subclass for the given color format and component.
+    """
+    decimals = None if isinstance(ui_range[0], int) and isinstance(ui_range[1], int) else 3
+    class_name = f"{fmt.upper()}{comp.capitalize()}Control"
 
-# ---------------------------
-# Example Concrete Controls
-# ---------------------------
-class HSVHueControl(PairControl):
-    def __init__(self):
-        # For HSV hue, both actual and UI ranges are 0 to 359.
-        super().__init__(name="HSVHue", actual_range=(0, 359), ui_range=(0, 359), steps=20)
-
-    def get_value(self, color):
-        return color.hsvHue()
-
-    def set_value(self, color, value):
-        color.setHsv(value, color.hsvSaturation(), color.value(), color.alpha())
-
-
-class HSVSaturationControl(PairControl):
-    def __init__(self):
-        super().__init__(name="HSVSaturation", actual_range=(0, 255), ui_range=(0, 255), steps=20)
+    def __init__(self, steps_override=steps):
+        PairControl.__init__(
+            self,
+            name=class_name,
+            actual_range=actual_range,
+            ui_range=ui_range,
+            steps=steps_override,
+            decimals=decimals,
+        )
+        self.format = fmt
+        self.component = comp
 
     def get_value(self, color):
-        return color.hsvSaturation()
+        return color.get(fmt, comp)
 
     def set_value(self, color, value):
-        color.setHsv(color.hsvHue(), value, color.value(), color.alpha())
+        color.set(fmt, comp, value)
 
+    def update_widgets(self, color):
+        PairControl.update_widgets(self, color)
 
-class ValueControl(PairControl):
-    def __init__(self):
-        super().__init__(name="Value", actual_range=(0, 255), ui_range=(0, 255), steps=20)
+    new_class = type(
+        class_name,
+        (PairControl,),
+        {
+            '__init__': __init__,
+            'get_value': get_value,
+            'set_value': set_value,
+            'update_widgets': update_widgets,
+        }
+    )
+    return new_class
 
-    def get_value(self, color):
-        return color.value()
-
-    def set_value(self, color, value):
-        color.setHsv(color.hsvHue(), color.hsvSaturation(), value, color.alpha())
+def create_slider_classes_for_format(fmt: str, ui_ranges: list[tuple] = None):
+    """
+    For the given color format, dynamically generate slider control classes.
+    """
+    components = QColorEnhanced.getKeys(fmt)
+    if ui_ranges is None:
+        ui_ranges = [QColorEnhanced.getRange(fmt, comp) for comp in components]
+    if len(components) != len(ui_ranges):
+        raise ValueError("Mismatch between component count and UI ranges.")
+    return [create_slider_class(fmt, comp, ui_range, QColorEnhanced.getRange(fmt, comp))
+            for comp, ui_range in zip(components, ui_ranges)]
 
 
 class PantoneControl(ColorControl):
+    """
+    Pantone control using a ColorBlock for its preview.
+    """
     def __init__(self):
-        # Dummy ranges; Pantone control doesn't use a numeric slider.
         super().__init__(name="PantoneColor", actual_range=(0, 1), ui_range=(0, 1), steps=1)
 
     def create_widgets(self, parent: QWidget):
-        preview = QFrame(parent)
-        preview.setFixedSize(40, 25)
-        preview.setStyleSheet("background: gray; border: 1px solid #444;")
-        text_input = QLineEdit(parent)
-        text_input.setPlaceholderText("Enter Pantone name")
-        self.widgets = [preview, text_input]
+        self.preview = ColorBlock(QColorEnhanced(), parent=parent)
+        self.preview.setFixedSize(40, 25)
+        self.text_input = LineEdit(parent)
+        self.text_input.setPlaceholderText("Enter Pantone name")
+        self.widgets = [self.preview, self.text_input]
         return self.widgets
 
     def update_widgets(self, color):
         pantone_name = self.get_value(color)
-        preview, text_input = self.widgets
-        from utils import PantoneData, QColorEnhanced
+        from utils import PantoneData  # Assumed to exist.
         xyz_color = PantoneData.get_xyz(pantone_name)
         if xyz_color:
             new_color = QColorEnhanced()
-            new_color.setXYZ(xyz_color[0], xyz_color[1], xyz_color[2])
-            preview.setStyleSheet(f"background: {new_color.name()}; border: 1px solid #444;")
-        if not text_input.hasFocus():
-            text_input.blockSignals(True)
-            text_input.setText(pantone_name or "")
-            text_input.blockSignals(False)
+            new_color.setTuple("xyz", xyz_color)
+            self.preview.color = new_color
+            self.preview.update_style()
+        if not self.text_input.hasFocus():
+            self.text_input.blockSignals(True)
+            self.text_input.setText(pantone_name or "")
+            self.text_input.blockSignals(False)
 
     def connect_signals(self, on_value_changed):
-        self.on_value_changed_callback = on_value_changed
-        preview, text_input = self.widgets
-        text_input.textEdited.connect(lambda text: on_value_changed(text.strip()))
+        super().connect_signals(on_value_changed)
+        self.text_input.textEdited.connect(lambda text: on_value_changed(text.strip()))
 
     def get_value(self, color):
         return color.getPantone()
@@ -220,451 +159,385 @@ class PantoneControl(ColorControl):
     def set_value(self, color, value):
         color.setPantone(value)
 
-# ---------------------------
-# sRGB Controls
-# ---------------------------
-class RedControl(PairControl):
-    def __init__(self):
-        super().__init__(name="Red", actual_range=(0, 255), ui_range=(0, 255), steps=1)
 
-    def get_value(self, color):
-        return color.red()
-
-    def set_value(self, color, value):
-        color.setRgb(value, color.green(), color.blue(), color.alpha())
-
-
-class GreenControl(PairControl):
-    def __init__(self):
-        super().__init__(name="Green", actual_range=(0, 255), ui_range=(0, 255), steps=1)
-
-    def get_value(self, color):
-        return color.green()
-
-    def set_value(self, color, value):
-        color.setRgb(color.red(), value, color.blue(), color.alpha())
-
-
-class BlueControl(PairControl):
-    def __init__(self):
-        super().__init__(name="Blue", actual_range=(0, 255), ui_range=(0, 255), steps=1)
-
-    def get_value(self, color):
-        return color.blue()
-
-    def set_value(self, color, value):
-        color.setRgb(color.red(), color.green(), value, color.alpha())
-
-
-# ---------------------------
-# Lab Controls
-# ---------------------------
-class LABLightnessControl(PairControl):
-    def __init__(self):
-        super().__init__(name="LABLightness", actual_range=(0, 100), ui_range=(0, 100), steps=10)
-
-    def get_value(self, color):
-        return color.getLab()['L']
-
-    def set_value(self, color, value):
-        color.setLab(L=value)
-
-
-class LABAControl(PairControl):
-    def __init__(self):
-        super().__init__(name="LABA", actual_range=(-128, 127), ui_range=(-128, 127), steps=10)
-
-    def get_value(self, color):
-        return color.getLab()['a']
-
-    def set_value(self, color, value):
-        color.setLab(a=value)
-
-
-class LABBControl(PairControl):
-    def __init__(self):
-        super().__init__(name="LABB", actual_range=(-128, 127), ui_range=(-128, 127), steps=10)
-
-    def get_value(self, color):
-        return color.getLab()['b']
-
-    def set_value(self, color, value):
-        color.setLab(b=value)
-
-
-# ---------------------------
-# AdobeRGB Controls
-# ---------------------------
-class AdobeRedControl(PairControl):
-    def __init__(self):
-        super().__init__(name="AdobeRed", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getAdobeRGB()['r']
-
-    def set_value(self, color, value):
-        color.setAdobeRGB(r=value)
-
-
-class AdobeGreenControl(PairControl):
-    def __init__(self):
-        super().__init__(name="AdobeGreen", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getAdobeRGB()['g']
-
-    def set_value(self, color, value):
-        color.setAdobeRGB(g=value)
-
-
-class AdobeBlueControl(PairControl):
-    def __init__(self):
-        super().__init__(name="AdobeBlue", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getAdobeRGB()['b']
-
-    def set_value(self, color, value):
-        color.setAdobeRGB(b=value)
-
-
-# ---------------------------
-# XYZ Controls
-# ---------------------------
-class XYZXControl(PairControl):
-    def __init__(self):
-        super().__init__(name="XYZX", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getXYZ()['x']
-
-    def set_value(self, color, value):
-        color.setXYZ(x=value)
-
-
-class XYZYControl(PairControl):
-    def __init__(self):
-        super().__init__(name="XYZY", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getXYZ()['y']
-
-    def set_value(self, color, value):
-        color.setXYZ(y=value)
-
-
-class XYZZControl(PairControl):
-    def __init__(self):
-        super().__init__(name="XYZZ", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getXYZ()['z']
-
-    def set_value(self, color, value):
-        color.setXYZ(z=value)
-
-
-# ---------------------------
-# xyY Controls
-# ---------------------------
-class xyYxControl(PairControl):
-    def __init__(self):
-        super().__init__(name="xyYx", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getxyY()['x']
-
-    def set_value(self, color, value):
-        color.setxyY(x=value)
-
-
-class xyYyControl(PairControl):
-    def __init__(self):
-        super().__init__(name="xyYy", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getxyY()['y']
-
-    def set_value(self, color, value):
-        color.setxyY(y=value)
-
-
-class xyYYControl(PairControl):
-    def __init__(self):
-        super().__init__(name="xyYY", actual_range=(0, 1.0), ui_range=(0, 1.0), steps=10, decimals=3)
-
-    def get_value(self, color):
-        return color.getxyY()['Y']
-
-    def set_value(self, color, value):
-        color.setxyY(Y=value)
-
-
-# ---------------------------
-# HSL Controls
-# ---------------------------
-class HSLHueControl(PairControl):
-    def __init__(self):
-        super().__init__(name="HSLHue", actual_range=(0, 359), ui_range=(0, 359), steps=20)
-
-    def get_value(self, color):
-        return color.hslHue()
-
-    def set_value(self, color, value):
-        color.setHsl(value, color.hslSaturation(), color.lightness(), color.alpha())
-
-
-class HSLSaturationControl(PairControl):
-    def __init__(self):
-        super().__init__(name="HSLSaturation", actual_range=(0, 255), ui_range=(0, 255), steps=1)
-
-    def get_value(self, color):
-        return color.hslSaturation()
-
-    def set_value(self, color, value):
-        color.setHsl(color.hslHue(), value, color.lightness(), color.alpha())
-
-
-class HSLLightnessControl(PairControl):
-    def __init__(self):
-        super().__init__(name="HSLLightness", actual_range=(0, 255), ui_range=(0, 255), steps=2)
-
-    def get_value(self, color):
-        return color.lightness()
-
-    def set_value(self, color, value):
-        color.setHsl(color.hslHue(), color.hslSaturation(), value, color.alpha())
-
-
-# ---------------------------
-# CMYK Controls
-# ---------------------------
-class CyanControl(PairControl):
-    def __init__(self):
-        # UI range is 0-100 while actual range is 0-255.
-        super().__init__(name="Cyan", actual_range=(0, 255), ui_range=(0, 100), steps=1)
-
-    def get_value(self, color):
-        return color.cyan()
-
-    def set_value(self, color, value):
-        color.setCmyk(value, color.magenta(), color.yellow(), color.black(), color.alpha())
-
-
-class MagentaControl(PairControl):
-    def __init__(self):
-        super().__init__(name="Magenta", actual_range=(0, 255), ui_range=(0, 100), steps=1)
-
-    def get_value(self, color):
-        return color.magenta()
-
-    def set_value(self, color, value):
-        color.setCmyk(color.cyan(), value, color.yellow(), color.black(), color.alpha())
-
-
-class YellowControl(PairControl):
-    def __init__(self):
-        super().__init__(name="Yellow", actual_range=(0, 255), ui_range=(0, 100), steps=1)
-
-    def get_value(self, color):
-        return color.yellow()
-
-    def set_value(self, color, value):
-        color.setCmyk(color.cyan(), color.magenta(), value, color.black(), color.alpha())
-
-
-class KeyControl(PairControl):
-    def __init__(self):
-        super().__init__(name="Key", actual_range=(0, 255), ui_range=(0, 100), steps=1)
-
-    def get_value(self, color):
-        return color.black()
-
-    def set_value(self, color, value):
-        color.setCmyk(color.cyan(), color.magenta(), color.yellow(), value, color.alpha())
-
-class CombinationsControl(ColorControl):
+class ComplementsControl(ColorControl):
     """
-    A control that displays color combination palettes.
-    
-    It shows three rows:
-      - Complementary: a single button showing the complement of the current color.
-      - Triadic: three buttons showing the current color and its two triadic complements.
-      - Tetradic: four buttons showing the current color and three tetradic complements.
-      
-    Clicking any of these buttons will set that color as the current color.
+    A control that displays complementary, triadic, and tetradic color combinations
+    using rows of ColorBlock instances.
     """
     def __init__(self):
-        # Dummy ranges.
-        super().__init__(name="Combinations", actual_range=(0, 1), ui_range=(0, 1), steps=1)
-        # We'll store our buttons in a dictionary keyed by mode.
-        self.combination_buttons = {
-            "complementary": [],
-            "triadic": [],
-            "tetradic": []
-        }
+        super().__init__(name="Complements", actual_range=(0, 1), ui_range=(0, 1), steps=1)
+        self.blocks = {"complementary": [], "triadic": [], "tetradic": []}
 
     def create_widgets(self, parent: QWidget):
-        # Create a container widget with a vertical layout.
         container = QWidget(parent)
-        layout = QVBoxLayout(container)
-        layout.setSpacing(5)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        # --- Complementary Row ---
-        comp_layout = QHBoxLayout()
-        comp_label = QLabel("Monadic:", container)
-        comp_layout.addWidget(comp_label)
-        comp_btns = []
-        for _ in range(2):
-            btn = QPushButton(container)
-            btn.setFixedSize(40, 25)
-            comp_layout.addWidget(btn)
-            comp_btns.append(btn)
-        self.combination_buttons["complementary"] = comp_btns
-        layout.addLayout(comp_layout)
-        
-        # --- Triadic Row ---
-        tri_layout = QHBoxLayout()
-        tri_label = QLabel("Triadic:", container)
-        tri_layout.addWidget(tri_label)
-        tri_btns = []
-        for _ in range(3):
-            btn = QPushButton(container)
-            btn.setFixedSize(40, 25)
-            tri_layout.addWidget(btn)
-            tri_btns.append(btn)
-        self.combination_buttons["triadic"] = tri_btns
-        layout.addLayout(tri_layout)
-        
-        # --- Tetradic Row ---
-        tet_layout = QHBoxLayout()
-        tet_label = QLabel("Tetradic:", container)
-        tet_layout.addWidget(tet_label)
-        tet_btns = []
-        for _ in range(4):
-            btn = QPushButton(container)
-            btn.setFixedSize(40, 25)
-            tet_layout.addWidget(btn)
-            tet_btns.append(btn)
-        self.combination_buttons["tetradic"] = tet_btns
-        layout.addLayout(tet_layout)
-        
+        main_layout = QVBoxLayout(container)
+        main_layout.setSpacing(5)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addLayout(self._create_row(container, "Complementary:", 2, "complementary"))
+        main_layout.addLayout(self._create_row(container, "Triadic:", 3, "triadic"))
+        main_layout.addLayout(self._create_row(container, "Tetradic:", 4, "tetradic"))
         self.widgets = [container]
         return self.widgets
 
+    def _create_row(self, parent: QWidget, label_text: str, count: int, mode: str):
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel(label_text, parent))
+        blocks = []
+        for _ in range(count):
+            block = ColorBlock(QColorEnhanced(), on_click=self.handle_block_click, parent=parent)
+            block.setFixedSize(40, 25)
+            layout.addWidget(block)
+            blocks.append(block)
+        self.blocks[mode] = blocks
+        return layout
+
     def update_widgets(self, color):
-        # Update the control's current color and compute combinations.
-        # Get HSV components.
-        h = color.hsvHue()
-        s = color.hsvSaturation()
-        v = color.value()
-        a = color.alpha()
-        
-        # --- Complementary ---
-        # Complement: hue shifted by 180.
-        comp_hue = (h + 180) % 360
-        comp_color = QColor.fromHsv(comp_hue, s, v, a)
-        comp_btns = self.combination_buttons["complementary"]
-        comp_btns[0].setStyleSheet(
-            f"background-color: {color.name()}; border: 1px solid #444;"
-        )
-        comp_btns[1].setStyleSheet(
-            f"background-color: {comp_color.name()}; border: 1px solid #444;"
-        )
-        
-        # --- Triadic ---
-        # Triadic: current, and hues +120 and +240.
-        tri_color1 = QColor.fromHsv((h + 120) % 360, s, v, a)
-        tri_color2 = QColor.fromHsv((h + 240) % 360, s, v, a)
-        tri_btns = self.combination_buttons["triadic"]
-        # We'll show the current color first.
-        tri_btns[0].setStyleSheet(
-            f"background-color: {color.name()}; border: 1px solid #444;"
-        )
-        tri_btns[1].setStyleSheet(
-            f"background-color: {tri_color1.name()}; border: 1px solid #444;"
-        )
-        tri_btns[2].setStyleSheet(
-            f"background-color: {tri_color2.name()}; border: 1px solid #444;"
-        )
-        
-        # --- Tetradic ---
-        # Tetradic: current, and hues +90, +180, +270.
-        tet_color1 = QColor.fromHsv((h + 90) % 360, s, v, a)
-        tet_color2 = QColor.fromHsv((h + 180) % 360, s, v, a)
-        tet_color3 = QColor.fromHsv((h + 270) % 360, s, v, a)
-        tet_btns = self.combination_buttons["tetradic"]
-        tet_btns[0].setStyleSheet(
-            f"background-color: {color.name()}; border: 1px solid #444;"
-        )
-        tet_btns[1].setStyleSheet(
-            f"background-color: {tet_color1.name()}; border: 1px solid #444;"
-        )
-        tet_btns[2].setStyleSheet(
-            f"background-color: {tet_color2.name()}; border: 1px solid #444;"
-        )
-        tet_btns[3].setStyleSheet(
-            f"background-color: {tet_color3.name()}; border: 1px solid #444;"
-        )
+        hsv = color.getTuple("hsv", clamped=True)
+        h, s, v = hsv
+        a = 1.0
+        combinations = {
+            "complementary": [0, 180],
+            "triadic": [0, 120, 240],
+            "tetradic": [0, 90, 180, 270]
+        }
+        for mode, offsets in combinations.items():
+            for block, offset in zip(self.blocks[mode], offsets):
+                new_hue = ((h + offset) % 360) / 360.0
+                new_color = QColorEnhanced(QColor.fromHsvF(new_hue, s, v, a))
+                block.color = new_color
+                block.update_style()
 
     def connect_signals(self, on_value_changed):
         self.on_value_changed_callback = on_value_changed
-        # Connect every combination button so that when clicked, it sets the current color.
-        for mode, btns in self.combination_buttons.items():
-            for btn in btns:
-                # Use a lambda with a default argument so that the button reference is captured.
-                btn.clicked.connect(partial(self.handleButtonClick, btn))
 
-    def handleButtonClick(self, btn):
-        # When a button is clicked, extract its background color (from its style sheet)
-        # and use that as the new color.
-        style = btn.styleSheet()
-        prefix = "background-color: "
-        start = style.find(prefix)
-        if start != -1:
-            start += len(prefix)
-            end = style.find(";", start)
-            hex_color = style[start:end].strip()
-            new_color = QColor(hex_color)
-            if self.on_value_changed_callback:
-                self.on_value_changed_callback(new_color)
-            Settings.set("currentColor", new_color)
-            self.update_widgets(new_color)
+    def handle_block_click(self, color):
+        if self.on_value_changed_callback:
+            self.on_value_changed_callback(color)
+        self.update_widgets(color)
 
     def get_value(self, color):
         return color
 
     def set_value(self, color, value):
-        # 'value' should be a QColor.
+        color.copyValues(value)
         self.update_widgets(value)
 
-COLOR_CONTROL_REGISTRY = {
-    "HSVHue": HSVHueControl,
-    "HSVSaturation": HSVSaturationControl,
-    "Value": ValueControl,
-    "PantoneColor": PantoneControl,
-    "Red": RedControl,
-    "Green": GreenControl,
-    "Blue": BlueControl,
-    "LABLightness": LABLightnessControl,
-    "LABA": LABAControl,
-    "LABB": LABBControl,
-    "AdobeRed": AdobeRedControl,
-    "AdobeGreen": AdobeGreenControl,
-    "AdobeBlue": AdobeBlueControl,
-    "XYZX": XYZXControl,
-    "XYZY": XYZYControl,
-    "XYZZ": XYZZControl,
-    "xyYx": xyYxControl,
-    "xyYy": xyYyControl,
-    "xyYY": xyYYControl,
-    "HSLHue": HSLHueControl,
-    "HSLSaturation": HSLSaturationControl,
-    "HSLLightness": HSLLightnessControl,
-    "Cyan": CyanControl,
-    "Magenta": MagentaControl,
-    "Yellow": YellowControl,
-    "Key": KeyControl,
-    "Complementary": CombinationsControl
-}
+class ITPGradientControl(ColorControl):
+    """
+    A simplified control for generating and displaying gradients
+    with separate discrete and smooth previews. Uses ColorArc for the arc.
+
+    Class Variables:
+        saturation (float): Shared saturation value.
+        hue (float): Shared hue (rotation) value.
+        num_colors (int): Shared number of colors.
+    """
+    # Persistent values shared across instances.
+    saturation = 1.0
+    hue = 0.0
+    num_colors = 5
+
+    def __init__(self):
+        super().__init__(name="ITPGradient", actual_range=(0, 1), ui_range=(0, 1))
+        self.decimals = 3
+        self.current_colors = [QColorEnhanced()]
+        self.current_gradient_colors = []
+        self.on_value_changed_callback = None
+        self.swatches = []
+        self.use_single = False
+        self.color_arc = None  # Will hold a ColorArc instance
+
+    def create_widgets(self, parent: QWidget):
+        self.container = QWidget(parent)
+        main_layout = QVBoxLayout(self.container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # --- Saturation Control ---
+        self.saturation_pair = SliderSpinBoxPair(
+            (1.0, 3.0), (1.0, 3.0), decimals=self.decimals, label_text="Sat.", parent=self.container
+        )
+        self.saturation_pair.steps = 5
+        self.saturation_pair.setLabelWidth(25)
+        # Initialize from the shared class variable.
+        self.saturation_pair.slider.setValue(ITPGradientControl.saturation)
+        main_layout.addWidget(self.saturation_pair)
+
+        # --- Hue Control ---
+        self.rotation_pair = SliderSpinBoxPair(
+            (0.0, 360.0), (0.0, 360.0), decimals=self.decimals, label_text="Hue", parent=self.container
+        )
+        self.rotation_pair.steps = 5
+        self.rotation_pair.setLabelWidth(25)
+        # Initialize from the shared class variable.
+        self.rotation_pair.slider.setValue(ITPGradientControl.hue)
+        main_layout.addWidget(self.rotation_pair)
+
+        # --- Number of Colors ---
+        spin_layout = QHBoxLayout()
+        spin_label = QLabel("Colors:", self.container)
+        spin_layout.addWidget(spin_label)
+        self.spinbox = QSpinBox(self.container)
+        self.spinbox.setFixedWidth(60)
+        # Initialize from the shared class variable.
+        self.spinbox.setValue(ITPGradientControl.num_colors)
+        self.spinbox.setMinimum(1)
+        self.spinbox.setMaximum(16)
+        spin_layout.addWidget(self.spinbox)
+        main_layout.addLayout(spin_layout)
+
+        # --- Unified Gradient Preview (Discrete & Smooth) ---
+        preview_container = QWidget(self.container)
+        preview_layout = QVBoxLayout(preview_container)
+        preview_layout.setContentsMargins(0, 10, 0, 0)
+        preview_layout.setSpacing(1)
+
+        # Instead of a QHBoxLayout, we create our new ExpandableColorBlocksWidget
+        self.discrete_container = ExpandableColorBlocksWidget(total_width=275, parent=preview_container, selectable=False)
+        preview_layout.addWidget(self.discrete_container)
+
+        # Smooth preview remains as before
+        self.smooth_preview = QWidget(preview_container)
+        self.smooth_preview.setFixedSize(275, 10)
+        preview_layout.addWidget(self.smooth_preview)
+
+        main_layout.addWidget(preview_container)
+
+        # --- CSS Gradient Toggle Button ---
+        self.css_dropdown = QPushButton("css gradients ▲", self.container)
+        self.css_dropdown.setFlat(True)
+        self.css_dropdown.setStyleSheet("color: #ddd; background-color: transparent;")
+        self.css_dropdown.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.css_dropdown.clicked.connect(self.toggle_css_visibility)
+        self.css_dropdown.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.css_dropdown, alignment=Qt.AlignCenter)
+
+        # --- CSS Line Edits Container (initially hidden) ---
+        self.css_container = QWidget(self.container)
+        css_layout = QVBoxLayout(self.css_container)
+        css_layout.setContentsMargins(0, 0, 0, 0)
+        css_layout.setSpacing(5)
+
+        css_label_width = 50
+
+        discrete_css_row = QHBoxLayout()
+        discrete_label = QLabel("Discrete:", self.css_container)
+        discrete_label.setFixedWidth(css_label_width)
+        discrete_css_row.addWidget(discrete_label)
+        self.discrete_css_lineedit = ClickableLineEdit(self.css_container)
+        discrete_css_row.addWidget(self.discrete_css_lineedit, 1)
+        css_layout.addLayout(discrete_css_row)
+
+        smooth_css_row = QHBoxLayout()
+        smooth_label = QLabel("Smooth:", self.css_container)
+        smooth_label.setFixedWidth(css_label_width)
+        smooth_css_row.addWidget(smooth_label)
+        self.smooth_css_lineedit = ClickableLineEdit(self.css_container)
+        smooth_css_row.addWidget(self.smooth_css_lineedit, 1)
+        css_layout.addLayout(smooth_css_row)
+
+        main_layout.addWidget(self.css_container)
+        self.css_container.setVisible(False)
+
+        self.draw_buttons()
+
+        # --- Connect Signals and Update Class Variables ---
+        self.saturation_pair.valueChanged.connect(self.on_saturation_changed)
+        self.rotation_pair.valueChanged.connect(self.on_hue_changed)
+        self.spinbox.valueChanged.connect(self.on_num_colors_changed)
+
+        self.widgets = [self.container]
+        return self.widgets
+
+    def on_saturation_changed(self, value):
+        ITPGradientControl.saturation = value
+        self.compute_arc()
+
+    def on_hue_changed(self, value):
+        ITPGradientControl.hue = value
+        self.rotate_arc()
+
+    def on_num_colors_changed(self, value):
+        ITPGradientControl.num_colors = value
+        self.draw_buttons()
+
+    def toggle_css_visibility(self):
+        if self.css_container.isVisible():
+            self.css_container.setVisible(False)
+            self.css_dropdown.setText("css gradients ▲")
+        else:
+            self.css_container.setVisible(True)
+            self.css_dropdown.setText("css gradients ▼")
+
+    def compute_arc(self):
+        colors = self.current_colors
+        sat_val = self.saturation_pair.slider.value()
+        num_colors = self.spinbox.value()
+        if len(colors) != 2:
+                self.color_arc = ColorArcSingular.generate_color_arc(
+                self.current_colors[0],
+                num_colors,
+                sat_val
+            )
+        else:
+            self.color_arc = ColorArc.generate_color_arc(
+                self.current_colors[0],
+                self.current_colors[1],
+                num_colors,
+                sat_val
+            )
+        self.update_hue_slider_gradient()
+        self.rotate_arc()
+
+    def update_saturation_slider_gradient(self):
+        if self.color_arc is None:
+            return
+        # Update the base color for the saturation slider.
+        ColorArc.set_color_from_point(self.color_arc.arc_peak, self.saturation_pair._base_color)
+        self.saturation_pair.set_slider_gradient(self.saturation_pair._base_color, self.project_saturation)
+
+    def project_saturation(self, color, value):
+        if self.color_arc is None:
+            return
+        point = self.color_arc.project_saturation_value(value)
+        rotation = self.rotation_pair.slider.value()
+        point = self.color_arc.rotate_point(point, np.radians(rotation))
+        color.set("itp", i=point[0], t=point[1], p=point[2])
+
+    def update_hue_slider_gradient(self):
+        if self.color_arc is None:
+            return
+        ColorArc.set_color_from_point(self.color_arc.arc_peak, self.rotation_pair._base_color)
+        self.rotation_pair.set_slider_gradient(self.rotation_pair._base_color, self.project_hue)
+
+    def project_hue(self, color, value):
+        if self.color_arc is None:
+            return
+        point = self.color_arc.project_hue_value(value)
+        color.set("itp", i=point[0], t=point[1], p=point[2])
+
+    def draw_buttons(self):
+        """
+        Called whenever number-of-colors changes. Clears the container and re-adds
+        new ColorBlocks with the current gradient colors.
+        """
+        self.discrete_container.clearBlocks()
+
+        num_buttons = self.spinbox.value()
+        self.current_gradient_colors = [QColorEnhanced() for _ in range(num_buttons)]
+
+        for idx in range(num_buttons):
+            block = ColorBlock(
+                QColorEnhanced(),
+                on_click=lambda c, i=idx: self.swatch_clicked(i),
+                parent=self.discrete_container
+            )
+            self.discrete_container.addBlock(block)
+
+        self.discrete_container.finalizeBlocks()
+
+        self.compute_arc()
+
+    def swatch_clicked(self, index):
+        """
+        Example: copy color to clipboard on click. 
+        Also set container's selected index if you want the "un-hovered" state to highlight it.
+        """
+        ClipboardManager.copyColorToClipboard(self.current_gradient_colors[index])
+        self.discrete_container.setSelectedIndex(index)
+
+    def update_colors_from_arc(self, arc: ColorArc):
+        for (point, color) in zip(arc.polyline, self.current_gradient_colors):
+            color.set("itp", i=point[0], t=point[1], p=point[2])
+
+    def rotate_arc(self):
+        if self.color_arc is None:
+            return
+        rot_val = self.rotation_pair.slider.value()
+        # Rotate the entire arc.
+        rot_color_arc = self.color_arc.rotate_arc(math.radians(rot_val))
+        self.update_saturation_slider_gradient()
+        self.update_gradients(rot_color_arc)
+
+    def clear_swatches(self):
+        while self.gradient_layout.count():
+            item = self.gradient_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self.swatches = []
+
+    def update_gradients(self, arc=None):
+        if arc is None:
+            arc = self.color_arc
+        if arc is None:
+            return
+        self.update_colors_from_arc(arc)
+        for btn, col in zip(self.discrete_container.getBlocks(), self.current_gradient_colors):
+            btn.set_color(col)
+        self.update_gradient_display()
+
+    def update_widgets(self, colors):
+        if not colors:
+            return
+        self.current_colors = colors
+        self.update_saturation_slider_gradient()
+        self.compute_arc()
+
+    def update_gradient_display(self):
+        if not self.current_gradient_colors:
+            return
+        discrete_css = self._generate_css_gradient_string(self.current_gradient_colors, continuous=False)
+        smooth_css = self._generate_css_gradient_string(self.current_gradient_colors, continuous=True)
+        self.discrete_css_lineedit.setText(discrete_css)
+        self.smooth_css_lineedit.setText(smooth_css)
+        qlinear = self._generate_qlinear_gradient_string(self.current_gradient_colors)
+        self.smooth_preview.setStyleSheet(f"background: {qlinear};")
+
+    def swatch_clicked(self, index):
+        """
+        Example: copy color to clipboard on click. 
+        Also set container's selected index if you want the "un-hovered" state to highlight it.
+        """
+        ClipboardManager.copyColorToClipboard(self.current_gradient_colors[index])
+
+    def connect_signals(self, on_value_changed):
+        self.on_value_changed_callback = on_value_changed
+
+    def get_value(self, colors):
+        return colors
+
+    def _generate_css_gradient_string(self, colors, continuous=True):
+        if not colors:
+            return ""
+        n = len(colors)
+        if continuous:
+            stops = []
+            if n == 1:
+                stops = [f"{colors[0].name()} 0%", f"{colors[0].name()} 100%"]
+            else:
+                for i, col in enumerate(colors):
+                    fraction = i / (n - 1) * 100
+                    stops.append(f"{col.name()} {fraction:.0f}%")
+            return "linear-gradient(to right, " + ", ".join(stops) + ")"
+        else:
+            stops = []
+            step = 100 / n
+            for i, col in enumerate(colors):
+                start = i * step
+                end = (i + 1) * step
+                stops.append(f"{col.name()} {start:.0f}% {end:.0f}%")
+            return "linear-gradient(to right, " + ", ".join(stops) + ")"
+
+    def _generate_qlinear_gradient_string(self, colors):
+        if not colors:
+            return ""
+        n = len(colors)
+        stops = []
+        if n == 1:
+            stops = [f"stop:0 {colors[0].name()}", f"stop:1 {colors[0].name()}"]
+        else:
+            for i, col in enumerate(colors):
+                fraction = i / (n - 1)
+                stops.append(f"stop:{fraction:.2f} {col.name()}")
+        return "qlineargradient(x1:0, y1:0, x2:1, y2:0, " + ", ".join(stops) + ")"

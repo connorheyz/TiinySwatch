@@ -34,7 +34,7 @@ class PantoneData:
    
     @classmethod
     def generate_xyz_json(cls):
-        from .color_utils import QColorEnhanced
+        from color import QColorEnhanced
         from PySide6.QtGui import QColor
         #Convert hex values to xyz and create optimized JSON structure.
         original_path = os.path.join(os.path.dirname(__file__), 'pantone-colors.json')
@@ -45,7 +45,7 @@ class PantoneData:
         
         colors = []
         for name, hex_value in zip(data['names'], data['values']):
-            # Convert hex to xyz (D50 illuminant)
+            # Convert hex to xyz (D65 illuminant)
             srgb = QColorEnhanced(QColor(hex_value))
             
             xyz = srgb.getXYZ()

@@ -62,10 +62,10 @@ QPushButton#FormatLabel {
     text-align: left;
     padding-left: 0px;
     padding-bottom: 0px;
-    width: 30px;
     margin-bottom: 0px;
     margin-top: 0px;
     padding-top: 0px;
+    font-weight: bold;
 }
 
 QPushButton#ArrowButton:hover {

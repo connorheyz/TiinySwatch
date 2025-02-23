@@ -1,6 +1,5 @@
 from PySide6.QtCore import QSettings
-from PySide6.QtGui import QColor
-from .color_utils import QColorEnhanced
+from color import QColorEnhanced
 
 
 class Settings:
@@ -44,15 +43,17 @@ class Settings:
             'default': [],
             # Convert a list of color hex strings to a list of QColors when loading,
             # and the reverse when saving.
-            'load_converter': lambda val: [QColor(c) for c in val] if isinstance(val, list) else [],
-            'save_converter': lambda val: [c.name() for c in val] if isinstance(val, list) else [],
+            'type': list
         },
-        'currentColor': {
-            'default': '#ffffff',
+        'currentColors': {
+            'default': [QColorEnhanced()],
             # Convert the stored hex string to a QColor, and back to hex on save.
-            'load_converter': lambda val: val.clone() if isinstance(val, QColorEnhanced) else QColorEnhanced(QColor(val)),
-            'save_converter': lambda val: val.qcolor.name() if isinstance(val, QColorEnhanced) else '#ffffff',
+            'type': list
         },
+        'selectedIndex': {
+            'default': 0,
+            'type': int
+        }
     }
     
     # Internal dictionary holding *current* setting values at runtime.
@@ -76,14 +77,9 @@ class Settings:
                 raw_value = cls._qsettings.value(key, default_value, type=info_type)
             else:
                 raw_value = cls._qsettings.value(key, default_value)
-            load_converter = info.get('load_converter')
-            
-            if load_converter:
-                value = load_converter(raw_value)
-            else:
-                # If no converter is provided, just use the raw value
-                value = raw_value
 
+            value = raw_value
+            
             cls._settingsDict[key] = value
 
     @classmethod
@@ -120,12 +116,6 @@ class Settings:
         """Set a setting by key and notify SET listeners."""
         if key not in cls._settingsDict:
             raise KeyError(f"{key} is not a valid setting.")
-
-        # If you have a load_converter on the schema, you might want
-        # to convert incoming data to the right type. For example:
-        load_converter = cls._settingsSchema[key].get('load_converter')
-        if load_converter:
-            value = load_converter(value)
 
         cls._settingsDict[key] = value
         cls._notifyListeners(key, "SET", value)
@@ -170,7 +160,7 @@ class Settings:
     def appendToHistory(cls, color):
         """Add a color to the 'colors' history list."""
         current_list = cls._settingsDict['colors']
-        current_list.append(QColor(color))
+        current_list.append(color)
         cls._notifyListeners('colors', 'SET', current_list)
         cls.save()
 
@@ -179,39 +169,16 @@ class Settings:
         cls._settingsDict['colors'].pop(index)
         cls._notifyListeners('colors', 'SET', cls._settingsDict['colors'])
         cls.save()
-
+    
     @classmethod
-    def clearColorHistory(cls):
-        """Clear the color history."""
-        cls._settingsDict['colors'] = []
+    def setColor(cls, i, color):
+        cls._settingsDict['colors'][i] = color
         cls._notifyListeners('colors', 'SET', cls._settingsDict['colors'])
-        cls.save()
 
     @classmethod
-    def setCurrentColorHsv(cls, hue, sat, val):
-        """Set the currentColor setting using HSV values."""
-        color = cls._settingsDict['currentColor']
-        color.setHsv(hue, sat, val)
-        cls._notifyListeners('currentColor', 'SET', color)
-        cls.save()
-
+    def getColor(cls, i):
+        return cls._settingsDict['colors'][i]
+    
     @classmethod
-    def setCurrentColorRed(cls, red):
-        color = cls._settingsDict['currentColor']
-        color.setRed(red)
-        cls._notifyListeners('currentColor', 'SET', color)
-        cls.save()
-
-    @classmethod
-    def setCurrentColorBlue(cls, blue):
-        color = cls._settingsDict['currentColor']
-        color.setBlue(blue)
-        cls._notifyListeners('currentColor', 'SET', color)
-        cls.save()
-
-    @classmethod
-    def setCurrentColorGreen(cls, green):
-        color = cls._settingsDict['currentColor']
-        color.setGreen(green)
-        cls._notifyListeners('currentColor', 'SET', color)
-        cls.save()
+    def getCurrentColor(cls):
+        return cls._settingsDict['currentColors'][cls._settingsDict['selectedIndex']]
