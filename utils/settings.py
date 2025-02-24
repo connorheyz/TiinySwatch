@@ -3,7 +3,7 @@ from color import QColorEnhanced
 
 
 class Settings:
-    _qsettings = QSettings('TiinySwatch', 'ColorPickerApp')
+    _qsettings = QSettings('TiinySwatch', 'TiinySwatch')
     
     # This dictionary is our "schema" for the settings.
     # We define each setting exactly once here.
