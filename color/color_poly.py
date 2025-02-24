@@ -9,18 +9,17 @@ class ColorPoly:
     
     @classmethod
     def color_to_point(cls, color) -> np.ndarray:
-        itp = color.get("itp")
-        return np.array([itp['i'], itp['t'], itp['p']], dtype=float)
+        return color.getTuple("itp")
     
     @classmethod
     def point_to_color(cls, point: np.ndarray):
         color = QColorEnhanced()
-        color.set("itp", i=point[0], t=point[1], p=point[2])
+        color.setTuple("itp", point)
         return color
     
     @classmethod
     def set_color_from_point(cls, point, color):
-        color.set("itp", i=point[0], t=point[1], p=point[2])
+        color.setTuple("itp", point)
 
     def rotate_point(self, point: np.ndarray, theta_radians: float):
         """

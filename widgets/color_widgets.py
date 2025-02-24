@@ -125,6 +125,15 @@ class SliderSpinBoxPair(QWidget):
         self.slider.blockSignals(False)
         self.spinbox.blockSignals(False)
 
+    def set_handle_color(self, base_color):
+        style = f"""
+        QSlider::handle:horizontal {{
+            background: {base_color.name()}
+        }}
+        """
+        self.base_style = style
+        self.slider.setStyleSheet(style)
+
     def set_slider_gradient(self, base_color: QColorEnhanced, set_fn):
         """
         Generates and applies a QSS gradient to the slider’s groove.

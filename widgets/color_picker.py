@@ -1,5 +1,5 @@
 from functools import partial
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication, QLabel, QFrame, QHBoxLayout, QPushButton, QVBoxLayout, 
     QWidget, QMenu, QSizePolicy, QLayout
@@ -7,10 +7,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QCursor
 
 import styles
-from utils import Settings, ClipboardManager, NotificationManager, NotificationType
+from utils import Settings, ClipboardManager, NotificationManager
 from color import QColorEnhanced
 from widgets import HistoryPalette
-from .color_controls import create_slider_classes_for_format, ComplementsControl, ITPGradientControl, PantoneControl
+from .color_controls import create_slider_classes_for_format, ComplementsControl, ITPGradientControl, PantoneControl, ColorTetraControl
 
 from .color_widgets import ExpandableColorBlocksWidget, ColorBlock, CircularButton, LineEdit, NotificationBanner
 
@@ -32,13 +32,14 @@ class ColorPicker(QWidget):
         "Adobe RGB": create_slider_classes_for_format('adobe_rgb'),
         "Complements": [ComplementsControl],
         "Linear Gradient": [ITPGradientControl],
-        "Pantone Match": [PantoneControl]
+        "Pantone Match": [PantoneControl],
+        "Color Tetra": [ColorTetraControl]
     }
 
     # New grouping of formats into categories.
     FORMAT_CATEGORIES = {
         "Spaces": ["sRGB", "HSV", "HSL", "CMYK", "XYZ", "Lab", "Adobe RGB", "xyY", "IPT", "ITP"],
-        "Tools": ["Complements", "Linear Gradient", "Pantone Match"]
+        "Tools": ["Complements", "Linear Gradient", "Pantone Match", "Color Tetra"]
     }
 
     def __init__(self, parent=None):

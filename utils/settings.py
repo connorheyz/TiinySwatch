@@ -118,6 +118,11 @@ class Settings:
             raise KeyError(f"{key} is not a valid setting.")
 
         cls._settingsDict[key] = value
+        if (key == "currentColors"):
+            new_idx = min(cls._settingsDict["selectedIndex"], len(value))
+            if (new_idx != cls._settingsDict["selectedIndex"]):
+                cls._settingsDict["selectedIndex"] = new_idx
+                cls._notifyListeners("selectedIndex", "SET", )
         cls._notifyListeners(key, "SET", value)
         cls.save()
 

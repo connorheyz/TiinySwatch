@@ -265,9 +265,9 @@ class ColorArcSingular(ColorArc):
             polyline = np.tile(P, (n, 1))
             return cls(polyline, np.zeros(3), P)
         
-        chord_axis = (fixed_B - fixed_A)/d_fixed
-        
-        u = np.array(chord_axis)
+        u = np.array([1.0, saturation/3.0, saturation/3.0])
+        u_norm = np.linalg.norm(u)
+        u = u / u_norm
         A = P - ((d_fixed/3.0*saturation)/2.0) * u
         B = P + ((d_fixed/3.0*saturation)/2.0) * u
         polyline = np.linspace(A, B, n)
@@ -289,7 +289,7 @@ class ColorArcSingular(ColorArc):
         axis = np.cross(vA, vB)
         norm_axis = np.linalg.norm(axis)
         if norm_axis < 1e-12:
-            axis = np.array([0.0, 0.0, 1.0])
+            axis = np.array([1.0, 0.0, 0.0])
         else:
             axis = axis / norm_axis
 
@@ -329,7 +329,7 @@ class ColorArcSingular(ColorArc):
         axis = np.cross(vA, vB)
         norm_axis = np.linalg.norm(axis)
         if norm_axis < 1e-12:
-            axis = np.array([0.0, 0.0, 1.0])
+            axis = np.array([1.0, 0.0, 0.0])
         else:
             axis = axis / norm_axis
 
@@ -351,7 +351,9 @@ class ColorArcSingular(ColorArc):
         if d_fixed < 1e-12:
             return self.arc_peak
         
-        u = np.array([1.0, 0.0, 0.0])
+        u = np.array([1.0, saturation/3.0, saturation/3.0])
+        u_norm = np.linalg.norm(u)
+        u = u / u_norm
         A = P - (d_fixed/2.0) * u
         return A
     

@@ -96,8 +96,10 @@ class App(QMainWindow):
 
     def updateColorInfo(self, _color):
         # Update tray icon
-        color = Settings.getCurrentColor()
-        self.trayIcon.setIcon(self.createColoredIcon(color))
+        colors = Settings.get("currentColors")
+        index = Settings.get("selectedIndex")
+        if (index < len(colors)):
+            self.trayIcon.setIcon(self.createColoredIcon(colors[index]))
 
     def toggleColorPick(self):
         """Start the color picking process"""

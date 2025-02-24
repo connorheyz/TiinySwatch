@@ -3,7 +3,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QSpinBox, QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLayout, QSizePolicy
 from .color_widgets import ClickableLineEdit, ColorBlock, ExpandableColorBlocksWidget, SliderSpinBoxPair, LineEdit
 from utils import ClipboardManager
-from color import QColorEnhanced, ColorArc, ColorArcSingular
+from color import QColorEnhanced, ColorArc, ColorArcSingular, ColorTetra
 import numpy as np
 import math
 
@@ -541,3 +541,152 @@ class ITPGradientControl(ColorControl):
                 fraction = i / (n - 1)
                 stops.append(f"stop:{fraction:.2f} {col.name()}")
         return "qlineargradient(x1:0, y1:0, x2:1, y2:0, " + ", ".join(stops) + ")"
+    
+class ColorTetraControl(ColorControl):
+    def __init__(self):
+        super().__init__(name="ITPGradient", actual_range=(0, 1), ui_range=(0, 1))
+        self.decimals = 3
+        self.current_color = QColorEnhanced()
+        self.current_gradient_colors = [QColorEnhanced() for _ in range(4)]
+        self.on_value_changed_callback = None
+        self.swatches = []
+        self.use_single = True
+        self.color_tetra = None  # Will hold a ColorTetra instance
+
+    def create_widgets(self, parent: QWidget):
+        import math
+        self.container = QWidget(parent)
+        main_layout = QVBoxLayout(self.container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # --- Saturation Control ---
+        self.saturation_pair = SliderSpinBoxPair(
+            (0.1, 2.0), (0.1, 2.0), decimals=self.decimals, label_text="Sat.", parent=self.container
+        )
+        self.saturation_pair.steps = 5
+        self.saturation_pair.setLabelWidth(25)
+        main_layout.addWidget(self.saturation_pair)
+
+        # --- Rotation Control (0 to 2π radians) ---
+        self.rotation_pair = SliderSpinBoxPair(
+            (0, math.pi), (0, math.pi), decimals=self.decimals, label_text="Hue", parent=self.container
+        )
+        self.rotation_pair.steps = 5
+        self.rotation_pair.setLabelWidth(25)
+        main_layout.addWidget(self.rotation_pair)
+
+        # --- Polar Control (0 to π radians) ---
+        self.polar_pair = SliderSpinBoxPair(
+            (0, math.pi), (0, math.pi), decimals=self.decimals, label_text="θ", parent=self.container
+        )
+        self.polar_pair.steps = 5
+        # Set default to π (so that the tetrahedron faces downward by default)
+        self.polar_pair.slider.setValue(math.pi)
+        self.polar_pair.setLabelWidth(25)
+        main_layout.addWidget(self.polar_pair)
+
+        # --- Azimuth Control (0 to 2π radians) ---
+        self.azimuth_pair = SliderSpinBoxPair(
+            (0, 2 * math.pi), (0, 2 * math.pi), decimals=self.decimals, label_text="φ", parent=self.container
+        )
+        self.azimuth_pair.steps = 5
+        self.azimuth_pair.setLabelWidth(25)
+        main_layout.addWidget(self.azimuth_pair)
+
+        # --- Unified Gradient Preview (Discrete & Smooth) ---
+        preview_container = QWidget(self.container)
+        preview_layout = QVBoxLayout(preview_container)
+        preview_layout.setContentsMargins(0, 10, 0, 0)
+        preview_layout.setSpacing(1)
+
+        self.discrete_container = ExpandableColorBlocksWidget(total_width=275, parent=preview_container, selectable=False)
+        preview_layout.addWidget(self.discrete_container)
+        main_layout.addWidget(preview_container)
+
+        # Connect signals from all sliders.
+        self.saturation_pair.valueChanged.connect(self.compute_tetra)
+        self.polar_pair.valueChanged.connect(self.compute_tetra)
+        self.azimuth_pair.valueChanged.connect(self.compute_tetra)
+        self.rotation_pair.valueChanged.connect(self.compute_tetra)
+        self.draw_buttons()
+
+        self.widgets = [self.container]
+        return self.widgets
+
+    def compute_tetra(self):
+        import math
+        color = self.current_color
+        sat_val = self.saturation_pair.slider.value()
+        polar_val = self.polar_pair.slider.value()
+        azimuth_val = self.azimuth_pair.slider.value()
+        rotation_val = self.rotation_pair.slider.value()
+
+        self.color_tetra = ColorTetra.generate_color_tetra(
+            color, sat_val, polar_val, azimuth_val, rotation_val
+        )
+        self.update_gradients()
+
+    def draw_buttons(self):
+        """
+        Called whenever number-of-colors changes. Clears the container and re-adds
+        new ColorBlocks with the current gradient colors.
+        """
+        self.discrete_container.clearBlocks()
+
+        num_buttons = 4
+        self.current_gradient_colors = [QColorEnhanced() for _ in range(num_buttons)]
+
+        for idx in range(num_buttons):
+            block = ColorBlock(
+                QColorEnhanced(),
+                on_click=lambda c, i=idx: self.swatch_clicked(i),
+                parent=self.discrete_container
+            )
+            self.discrete_container.addBlock(block)
+
+        self.discrete_container.finalizeBlocks()
+        self.compute_tetra()
+
+    def update_colors_from_tetra(self, shape: ColorTetra):
+        for (point, color) in zip(shape.polyline, self.current_gradient_colors):
+            color.set("itp", i=point[0], t=point[1], p=point[2])
+
+    def clear_swatches(self):
+        while self.gradient_layout.count():
+            item = self.gradient_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self.swatches = []
+
+    def update_gradients(self, tetra=None):
+        if tetra is None:
+            tetra = self.color_tetra
+        if tetra is None:
+            return
+        self.update_colors_from_tetra(tetra)
+        for btn, col in zip(self.discrete_container.getBlocks(), self.current_gradient_colors):
+            btn.set_color(col)
+
+    def update_widgets(self, color):
+        if not color:
+            return
+        self.current_color = color
+        self.saturation_pair.set_handle_color(color)
+        self.azimuth_pair.set_handle_color(color)
+        self.polar_pair.set_handle_color(color)
+        self.rotation_pair.set_handle_color(color)
+        self.compute_tetra()
+
+    def swatch_clicked(self, index):
+        """
+        Example: copy color to clipboard on click.
+        Also set container's selected index if you want the "un-hovered" state to highlight it.
+        """
+        ClipboardManager.copyColorToClipboard(self.current_gradient_colors[index])
+
+    def connect_signals(self, on_value_changed):
+        self.on_value_changed_callback = on_value_changed
+
+    def get_value(self, colors):
+        return colors
