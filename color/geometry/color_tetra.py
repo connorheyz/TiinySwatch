@@ -1,6 +1,5 @@
 import numpy as np
 import math
-from .color_enhanced import QColorEnhanced
 from .color_poly import ColorPoly
 
 class ColorTetra(ColorPoly):
@@ -14,6 +13,7 @@ class ColorTetra(ColorPoly):
     # Static rational approximation constants (replace with your actual values)
     
     def __init__(self, polyline: np.ndarray, arc_axis: np.ndarray, arc_peak: np.ndarray):
+        super().__init__()
         self._polyline = polyline
         self._arc_axis = arc_axis
         self._arc_peak = arc_peak
@@ -31,24 +31,23 @@ class ColorTetra(ColorPoly):
         return self._arc_peak
 
     @classmethod
-    def generate_color_tetra(cls, colorA, saturation, polar, azimuth, rotation):
+    def generate_color_tetra(cls, colorA, saturation, rotation):
         # Compute the apex point from the color.
         A = cls.color_to_point(colorA)
-        L = saturation * 0.05               # Edge length of the tetrahedron
+        L = saturation * 0.25               # Edge length of the tetrahedron
         R_length = L / math.sqrt(3)         # Circumradius of the base triangle
         h = math.sqrt(2/3) * L              # Height from the base to the apex
 
         # Convert polar/azimuth (spherical coordinates) into a direction vector.
         # Here, polar is the angle from the positive y-axis (so polar=pi gives (0,-1,0))
-        direction = np.array([
-            math.sin(polar) * math.cos(azimuth),
-            math.cos(polar),
-            math.sin(polar) * math.sin(azimuth)
-        ], dtype=float)
-        direction /= np.linalg.norm(direction)
+        direction = np.array([0.5, 0, 0]) - A
+        direction_norm = np.linalg.norm(direction)
+        if direction_norm < 1e-12:
+            direction = np.array(1, 0, 0)
+            direction_norm = 1
+        direction /= direction_norm
 
-        # The default "down" direction used in construction.
-        default_dir = np.array([0, -1, 0], dtype=float)
+        default_dir = np.array([0.0, -1.0, 0.0])
 
         # Helper: Rodrigues rotation formula.
         def rotation_matrix(axis, theta):

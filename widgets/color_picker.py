@@ -28,7 +28,9 @@ class ColorPicker(QWidget):
         "Lab": create_slider_classes_for_format('lab'),
         "xyY": create_slider_classes_for_format('xyy'),
         "IPT": create_slider_classes_for_format('ipt'),
+        "ICtCp": create_slider_classes_for_format('ictcp'),
         "ITP": create_slider_classes_for_format('itp'),
+        "Ipabp": create_slider_classes_for_format('iab'),
         "Adobe RGB": create_slider_classes_for_format('adobe_rgb'),
         "Complements": [ComplementsControl],
         "Linear Gradient": [ITPGradientControl],
@@ -38,7 +40,7 @@ class ColorPicker(QWidget):
 
     # New grouping of formats into categories.
     FORMAT_CATEGORIES = {
-        "Spaces": ["sRGB", "HSV", "HSL", "CMYK", "XYZ", "Lab", "Adobe RGB", "xyY", "IPT", "ITP"],
+        "Spaces": ["sRGB", "HSV", "HSL", "CMYK", "XYZ", "Lab", "Adobe RGB", "xyY", "IPT", "ICtCp", "ITP", "Iapbp"],
         "Tools": ["Complements", "Linear Gradient", "Pantone Match", "Color Tetra"]
     }
 
@@ -138,6 +140,7 @@ class ColorPicker(QWidget):
             sectionHeader = QHBoxLayout()
             sectionHeader.setContentsMargins(0, 0, 0, 0)
             fmtButton = QPushButton(fmt, objectName="FormatLabel")
+            fmtButton.setText(fmt)
             fmtButton.clicked.connect(partial(self.showFormatPopup, index))
             fmtButton.setFixedSize(120, 20)
             sectionHeader.addWidget(fmtButton)
@@ -262,7 +265,7 @@ class ColorPicker(QWidget):
             Settings.set("selectedIndex", 0)
         currentColorIndex = Settings.get("selectedIndex")
         selected_color = current_colors[currentColorIndex]
-        self.hexEdit.setTextWithFocus(selected_color.name(QColor.HexRgb))
+        self.hexEdit.setTextWithFocus(selected_color.name())
         for control in self.controls.values():
             if control.use_single:
                 control.update_widgets(selected_color)

@@ -46,11 +46,11 @@ class PantoneData:
         colors = []
         for name, hex_value in zip(data['names'], data['values']):
             # Convert hex to xyz (D65 illuminant)
-            srgb = QColorEnhanced(QColor(hex_value))
+            srgb = QColorEnhanced.from_qcolor(QColor(hex_value))
             
-            xyz = srgb.getXYZ()
+            xyz = srgb.getTuple("xyz")
             
-            colors.append((name, [xyz["x"], xyz["y"], xyz["z"]]))
+            colors.append((name, [xyz[0], xyz[1], xyz[2]]))
         
         # Create sorted output structure
         output = {

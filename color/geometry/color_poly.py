@@ -1,25 +1,28 @@
 import numpy as np
 import math
-from .color_enhanced import QColorEnhanced
+from color.color_enhanced import QColorEnhanced
 
 class ColorPoly:
+
+    _format = "iab"
+
     @property
     def polyline(self):
         return self._polyline
     
     @classmethod
     def color_to_point(cls, color) -> np.ndarray:
-        return color.getTuple("itp")
+        return color.get_tuple(cls._format)
     
     @classmethod
     def point_to_color(cls, point: np.ndarray):
-        color = QColorEnhanced()
-        color.setTuple("itp", point)
+        args = {cls._format: point}
+        color = QColorEnhanced(**args)
+        color.set_tuple(cls._format, point)
         return color
-    
-    @classmethod
-    def set_color_from_point(cls, point, color):
-        color.setTuple("itp", point)
+
+    def set_color_from_point(self, color, point):
+        color.set_tuple(self._format, point)
 
     def rotate_point(self, point: np.ndarray, theta_radians: float):
         """

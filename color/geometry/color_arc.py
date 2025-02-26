@@ -1,11 +1,6 @@
 import numpy as np
 import math
-from .color_enhanced import QColorEnhanced
 from .color_poly import ColorPoly
-
-# These constants define the fixed chord length (distance between endpoints)
-BLACK_ITP = [7.30955903e-07, -7.95644352e-23, 1.23146514e-22]
-WHITE_ITP = [1.49945672e-01, -2.18083895e-06,  4.03363671e-06]
 
 class ColorArc(ColorPoly):
     """
@@ -24,6 +19,7 @@ class ColorArc(ColorPoly):
                                 1140.93828543, 172.44578339, 1078.89797726])
     
     def __init__(self, polyline: np.ndarray, arc_axis: np.ndarray, arc_peak: np.ndarray):
+        super().__init__()
         self._polyline = polyline
         self._arc_axis = arc_axis
         self._arc_peak = arc_peak
@@ -38,12 +34,10 @@ class ColorArc(ColorPoly):
 
     @classmethod
     def _compute_theta(cls, saturation: float, d: float) -> float:
-        """
-        Helper to compute the rational approximation of theta given saturation and chord length.
-        """
+
         if math.isclose(saturation, 1.0, abs_tol=1e-10):
             return 0.0
-        d_ref = 0.05
+        d_ref = 0.5
         effective_saturation = 1 + (saturation - 1) * (d_ref / d)
         x = effective_saturation - 1.0
         params = cls.RATIONAL_PARAMS
@@ -52,15 +46,7 @@ class ColorArc(ColorPoly):
 
     @classmethod
     def generate_color_arc(cls, colorA, colorB, n: int, saturation: float):
-        """
-        Generate a ColorArc from two QColorEnhanced objects.
-        The arc is generated in ITP-space using a vectorized algorithm with a
-        third-degree rational function to compute theta. The saturation value is normalized
-        so that similar step sizes are produced regardless of the distance from A to B.
-        
-        The arc_peak is computed as the point on the circle at half the sweep angle.
-        Rotation (in degrees) is applied to the arc.
-        """
+
         A = cls.color_to_point(colorA)
         B = cls.color_to_point(colorB)
         A = np.asarray(A, dtype=float)
@@ -172,7 +158,7 @@ class ColorArc(ColorPoly):
 
         arc_axis = chord / d
 
-        d_ref = 0.05
+        d_ref = 0.5
         effective_saturation = 1 + (saturation - 1) * (d_ref / d)
         
         x = effective_saturation - 1.0
@@ -258,8 +244,8 @@ class ColorArcSingular(ColorArc):
         # Convert input color to ITP point (this will be our arc_peak)
         P = np.asarray(cls.color_to_point(color), dtype=float)
         # Use the fixed chord length (distance between WHITE and BLACK)
-        fixed_A = np.array(BLACK_ITP, dtype=float)
-        fixed_B = np.array(WHITE_ITP, dtype=float)
+        fixed_A = np.array([1, 0, 0], dtype=float)
+        fixed_B = np.array([0, 0, 0], dtype=float)
         d_fixed = np.linalg.norm(fixed_B - fixed_A)
         if d_fixed < 1e-12:
             polyline = np.tile(P, (n, 1))
@@ -345,8 +331,8 @@ class ColorArcSingular(ColorArc):
     def project_saturation_value(self, saturation: float) -> np.ndarray:
         P = self._arc_peak
         # Use the fixed chord length (distance between WHITE and BLACK)
-        fixed_A = np.array(BLACK_ITP, dtype=float)
-        fixed_B = np.array(WHITE_ITP, dtype=float)
+        fixed_A = np.array([1, 0, 0], dtype=float)
+        fixed_B = np.array([0, 0, 0], dtype=float)
         d_fixed = np.linalg.norm(fixed_B - fixed_A)/3.0*saturation
         if d_fixed < 1e-12:
             return self.arc_peak

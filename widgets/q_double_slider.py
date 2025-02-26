@@ -2,6 +2,9 @@
 from PySide6.QtWidgets import QSlider
 from PySide6.QtCore import Signal
 
+INT_MAX = 2**31 - 1
+INT_MIN = -2**31
+
 class QDoubleSlider(QSlider):
 
     doubleValueChanged = Signal(float)
@@ -32,7 +35,10 @@ class QDoubleSlider(QSlider):
         return float(super().singleStep()) / self._multi
 
     def setValue(self, value):
-        super().setValue(int(value * self._multi))
+        result = max(INT_MIN, min(value * self._multi, INT_MAX))
+        clamped_result = int(result)  # Ensures the value stays in range
+
+        super().setValue(clamped_result)
 
     def setRange(self, min, max):
         self.setMinimum(min)

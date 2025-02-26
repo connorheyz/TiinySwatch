@@ -50,7 +50,7 @@ class TransparentOverlay(QDialog):
             # Calculate average color
             self.calculateAverageColor()
             if self.averageColor:
-                Settings.set("currentColors", [QColorEnhanced(self.averageColor)])
+                Settings.set("currentColors", [QColorEnhanced.from_qcolor(self.averageColor)])
                 for color in Settings.get("currentColors"):
                     Settings.appendToHistory(color)
                     if Settings.get("CLIPBOARD"):
@@ -75,15 +75,15 @@ class TransparentOverlay(QDialog):
         for x in range(rect.left(), rect.right(), max(rect.width() // 10,1)):  # Sample points for performance
             for y in range(rect.top(), rect.bottom(), max(rect.height() // 10,1)):
                 color = self.screenshot.pixelColor(x, y)
-                totalR += color.red()
-                totalG += color.green()
-                totalB += color.blue()
+                totalR += color.redF()
+                totalG += color.greenF()
+                totalB += color.blueF()
                 count +=1
         if count > 0:
-            avgR = totalR // count
-            avgG = totalG // count
-            avgB = totalB // count
-            self.averageColor = QColor(avgR, avgG, avgB)
+            avgR = totalR / count
+            avgG = totalG / count
+            avgB = totalB / count
+            self.averageColor = QColor.fromRgbF(avgR, avgG, avgB)
 
     def paintEvent(self, event):
         painter = QPainter(self)

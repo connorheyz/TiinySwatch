@@ -3,7 +3,8 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QSpinBox, QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLayout, QSizePolicy
 from .color_widgets import ClickableLineEdit, ColorBlock, ExpandableColorBlocksWidget, SliderSpinBoxPair, LineEdit
 from utils import ClipboardManager
-from color import QColorEnhanced, ColorArc, ColorArcSingular, ColorTetra
+from color import QColorEnhanced
+from color.geometry import ColorArc, ColorArcSingular, ColorTetra
 import numpy as np
 import math
 
@@ -111,12 +112,12 @@ def create_slider_classes_for_format(fmt: str, ui_ranges: list[tuple] = None):
     """
     For the given color format, dynamically generate slider control classes.
     """
-    components = QColorEnhanced.getKeys(fmt)
+    components = QColorEnhanced.get_keys(fmt)
     if ui_ranges is None:
-        ui_ranges = [QColorEnhanced.getRange(fmt, comp) for comp in components]
+        ui_ranges = [QColorEnhanced.get_range(fmt, comp) for comp in components]
     if len(components) != len(ui_ranges):
         raise ValueError("Mismatch between component count and UI ranges.")
-    return [create_slider_class(fmt, comp, ui_range, QColorEnhanced.getRange(fmt, comp))
+    return [create_slider_class(fmt, comp, ui_range, QColorEnhanced.get_range(fmt, comp))
             for comp, ui_range in zip(components, ui_ranges)]
 
 
@@ -140,8 +141,7 @@ class PantoneControl(ColorControl):
         from utils import PantoneData  # Assumed to exist.
         xyz_color = PantoneData.get_xyz(pantone_name)
         if xyz_color:
-            new_color = QColorEnhanced()
-            new_color.setTuple("xyz", xyz_color)
+            new_color = QColorEnhanced(xyz=xyz_color)
             self.preview.color = new_color
             self.preview.update_style()
         if not self.text_input.hasFocus():
@@ -154,10 +154,10 @@ class PantoneControl(ColorControl):
         self.text_input.textEdited.connect(lambda text: on_value_changed(text.strip()))
 
     def get_value(self, color):
-        return color.getPantone()
+        return color.get_pantone()
 
     def set_value(self, color, value):
-        color.setPantone(value)
+        color.set_pantone(value)
 
 
 class ComplementsControl(ColorControl):
@@ -193,9 +193,8 @@ class ComplementsControl(ColorControl):
         return layout
 
     def update_widgets(self, color):
-        hsv = color.getTuple("hsv", clamped=True)
+        hsv = color.get_tuple("hsv", clamped=True)
         h, s, v = hsv
-        a = 1.0
         combinations = {
             "complementary": [0, 180],
             "triadic": [0, 120, 240],
@@ -203,8 +202,8 @@ class ComplementsControl(ColorControl):
         }
         for mode, offsets in combinations.items():
             for block, offset in zip(self.blocks[mode], offsets):
-                new_hue = ((h + offset) % 360) / 360.0
-                new_color = QColorEnhanced(QColor.fromHsvF(new_hue, s, v, a))
+                new_hue = ((h + offset) % 360)
+                new_color = QColorEnhanced(hsv=[new_hue, s, v])
                 block.color = new_color
                 block.update_style()
 
@@ -220,7 +219,7 @@ class ComplementsControl(ColorControl):
         return color
 
     def set_value(self, color, value):
-        color.copyValues(value)
+        color.copy_values(value)
         self.update_widgets(value)
 
 class ITPGradientControl(ColorControl):
@@ -393,7 +392,7 @@ class ITPGradientControl(ColorControl):
         if self.color_arc is None:
             return
         # Update the base color for the saturation slider.
-        ColorArc.set_color_from_point(self.color_arc.arc_peak, self.saturation_pair._base_color)
+        self.color_arc.set_color_from_point(self.saturation_pair._base_color, self.color_arc.arc_peak)
         self.saturation_pair.set_slider_gradient(self.saturation_pair._base_color, self.project_saturation)
 
     def project_saturation(self, color, value):
@@ -402,19 +401,19 @@ class ITPGradientControl(ColorControl):
         point = self.color_arc.project_saturation_value(value)
         rotation = self.rotation_pair.slider.value()
         point = self.color_arc.rotate_point(point, np.radians(rotation))
-        color.set("itp", i=point[0], t=point[1], p=point[2])
+        self.color_arc.set_color_from_point(color, point)
 
     def update_hue_slider_gradient(self):
         if self.color_arc is None:
             return
-        ColorArc.set_color_from_point(self.color_arc.arc_peak, self.rotation_pair._base_color)
+        self.color_arc.set_color_from_point(self.rotation_pair._base_color, self.color_arc.arc_peak)
         self.rotation_pair.set_slider_gradient(self.rotation_pair._base_color, self.project_hue)
 
     def project_hue(self, color, value):
         if self.color_arc is None:
             return
         point = self.color_arc.project_hue_value(value)
-        color.set("itp", i=point[0], t=point[1], p=point[2])
+        self.color_arc.set_color_from_point(color, point)
 
     def draw_buttons(self):
         """
@@ -448,7 +447,7 @@ class ITPGradientControl(ColorControl):
 
     def update_colors_from_arc(self, arc: ColorArc):
         for (point, color) in zip(arc.polyline, self.current_gradient_colors):
-            color.set("itp", i=point[0], t=point[1], p=point[2])
+            arc.set_color_from_point(color, point)
 
     def rotate_arc(self):
         if self.color_arc is None:
@@ -554,17 +553,17 @@ class ColorTetraControl(ColorControl):
         self.color_tetra = None  # Will hold a ColorTetra instance
 
     def create_widgets(self, parent: QWidget):
-        import math
         self.container = QWidget(parent)
         main_layout = QVBoxLayout(self.container)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         # --- Saturation Control ---
         self.saturation_pair = SliderSpinBoxPair(
-            (0.1, 2.0), (0.1, 2.0), decimals=self.decimals, label_text="Sat.", parent=self.container
+            (0.001, 3.0), (0.001, 3.0), decimals=self.decimals, label_text="Sat.", parent=self.container
         )
         self.saturation_pair.steps = 5
         self.saturation_pair.setLabelWidth(25)
+        self.saturation_pair.set_value(1.0)
         main_layout.addWidget(self.saturation_pair)
 
         # --- Rotation Control (0 to 2π radians) ---
@@ -574,24 +573,6 @@ class ColorTetraControl(ColorControl):
         self.rotation_pair.steps = 5
         self.rotation_pair.setLabelWidth(25)
         main_layout.addWidget(self.rotation_pair)
-
-        # --- Polar Control (0 to π radians) ---
-        self.polar_pair = SliderSpinBoxPair(
-            (0, math.pi), (0, math.pi), decimals=self.decimals, label_text="θ", parent=self.container
-        )
-        self.polar_pair.steps = 5
-        # Set default to π (so that the tetrahedron faces downward by default)
-        self.polar_pair.slider.setValue(math.pi)
-        self.polar_pair.setLabelWidth(25)
-        main_layout.addWidget(self.polar_pair)
-
-        # --- Azimuth Control (0 to 2π radians) ---
-        self.azimuth_pair = SliderSpinBoxPair(
-            (0, 2 * math.pi), (0, 2 * math.pi), decimals=self.decimals, label_text="φ", parent=self.container
-        )
-        self.azimuth_pair.steps = 5
-        self.azimuth_pair.setLabelWidth(25)
-        main_layout.addWidget(self.azimuth_pair)
 
         # --- Unified Gradient Preview (Discrete & Smooth) ---
         preview_container = QWidget(self.container)
@@ -605,8 +586,6 @@ class ColorTetraControl(ColorControl):
 
         # Connect signals from all sliders.
         self.saturation_pair.valueChanged.connect(self.compute_tetra)
-        self.polar_pair.valueChanged.connect(self.compute_tetra)
-        self.azimuth_pair.valueChanged.connect(self.compute_tetra)
         self.rotation_pair.valueChanged.connect(self.compute_tetra)
         self.draw_buttons()
 
@@ -614,15 +593,12 @@ class ColorTetraControl(ColorControl):
         return self.widgets
 
     def compute_tetra(self):
-        import math
         color = self.current_color
         sat_val = self.saturation_pair.slider.value()
-        polar_val = self.polar_pair.slider.value()
-        azimuth_val = self.azimuth_pair.slider.value()
         rotation_val = self.rotation_pair.slider.value()
 
         self.color_tetra = ColorTetra.generate_color_tetra(
-            color, sat_val, polar_val, azimuth_val, rotation_val
+            color, sat_val, rotation_val
         )
         self.update_gradients()
 
@@ -649,7 +625,7 @@ class ColorTetraControl(ColorControl):
 
     def update_colors_from_tetra(self, shape: ColorTetra):
         for (point, color) in zip(shape.polyline, self.current_gradient_colors):
-            color.set("itp", i=point[0], t=point[1], p=point[2])
+            shape.set_color_from_point(color, point)
 
     def clear_swatches(self):
         while self.gradient_layout.count():
@@ -673,8 +649,6 @@ class ColorTetraControl(ColorControl):
             return
         self.current_color = color
         self.saturation_pair.set_handle_color(color)
-        self.azimuth_pair.set_handle_color(color)
-        self.polar_pair.set_handle_color(color)
         self.rotation_pair.set_handle_color(color)
         self.compute_tetra()
 

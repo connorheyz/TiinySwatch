@@ -22,15 +22,18 @@ QLabel {
     font-size: 1em;
 }
 
+QSlider {
+    height: 1.5em
+}
+
 QSlider::groove:horizontal {
-    height: 1.0em;
-    margin: 0 0;
+    margin: 4px 0;
+    padding: -2px 0;
 }
 
 QSlider::handle:horizontal {
     border: 2px solid white;
     width: 0.8em;
-    margin: -2px 0;
 }
 
 QPushButton {

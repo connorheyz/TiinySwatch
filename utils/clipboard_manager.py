@@ -28,10 +28,10 @@ def format_color_generic(color, config):
     space = config["space"]
     template = config["template"]
     # Retrieve the values as a tuple (order must match template placeholders).
-    values = color.getTuple(space)
+    values = color.get_tuple(space)
     
     target_ranges = config.get("target_ranges")
-    source_ranges = list(QColorEnhanced.getRange(space).values())
+    source_ranges = list(QColorEnhanced.get_range(space).values())
     
     if target_ranges is not None:
         scaled_values = []
@@ -128,7 +128,7 @@ class ClipboardManager:
     @classmethod
     def getFormattedColor(cls, color, format_type=None):
         if not isinstance(color, QColorEnhanced):
-            color = QColorEnhanced(color)
+            color = QColorEnhanced.from_qcolor(color)
         if format_type == None:
             format_type = Settings.get("FORMAT")
         config = cls.getTemplate(format_type)

@@ -78,6 +78,7 @@ class SliderSpinBoxPair(QWidget):
             self.slider = QDoubleSlider(self.decimals, Qt.Horizontal, self)
             self.spinbox = QDoubleSpinBox(self)
             self.spinbox.setSingleStep(10 ** (-self.decimals))
+            self.spinbox.setDecimals(self.decimals)
         else:
             self.slider = QSlider(Qt.Horizontal, self)
             self.spinbox = QSpinBox(self)
@@ -128,7 +129,8 @@ class SliderSpinBoxPair(QWidget):
     def set_handle_color(self, base_color):
         style = f"""
         QSlider::handle:horizontal {{
-            background: {base_color.name()}
+            background: {base_color.name()};
+            width: 0.8em;
         }}
         """
         self.base_style = style
@@ -140,7 +142,7 @@ class SliderSpinBoxPair(QWidget):
         The set_fn function is used to modify a color based on a test value.
         """
         stops = []
-        self._base_color.copyValues(base_color)
+        self._base_color.copy_values(base_color)
         for i in range(self.steps + 1):
             fraction = i / float(self.steps)
             test_val = self.actual_range[0] + fraction * (self.actual_range[1] - self.actual_range[0])
@@ -184,7 +186,7 @@ class ColorBlock(QPushButton):
         # Determine text color based on brightness from the HSV value.
         # Assuming HSV value (v) is in 0-255, use a threshold of 128.
         
-        text_color = "white" if self.color.getBWComplement() == 0 else "black"
+        text_color = "white" if self.color.get_bw_complement() == 0 else "black"
         
         # Base style includes background and border plus the computed text color.
         style = f"background-color: {self.color.name()}; border: none; color: {text_color};"
