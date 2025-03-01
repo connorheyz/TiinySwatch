@@ -1,4 +1,4 @@
-from cx_Freeze import setup, Executable 
+from cx_Freeze import setup, Executable
 import sys
 import os
 
@@ -18,18 +18,18 @@ bdist_msi_options = {
 }
 
 
-setup(name = "TiinySwatch" , 
-	version = "1.0" , 
-	description = "A one stop shop quick use color utility." , 
-    options = {
-        "bdist_msi": bdist_msi_options,
-    },
-	executables = [Executable(
-                            "app.py",
-                            shortcut_name="Tiiny Swatch",
-                            shortcut_dir="DesktopFolder",
-                            base="Win32GUI",
-                            icon="TiinySwatch.ico"
-                            )
-                ]
-) 
+setup(name="TiinySwatch",
+      version="1.0",
+      description="A one stop shop quick use color utility.",
+      options={
+          "bdist_msi": bdist_msi_options,
+      },
+      executables=[Executable(
+          "app.py",
+          shortcut_name="Tiiny Swatch",
+          shortcut_dir="DesktopFolder",
+          base="Win32GUI",
+          icon="TiinySwatch.ico"
+      )
+      ]
+      )

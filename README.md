@@ -1,3 +1,7 @@
+# Installation
+
+For the time being, this repository comes with an msi installer (TiinySwatch-1.0-win64.msi) in the root directory. Run this installer to install TiinySwatch. Once installed, a shortcut will automatically be added to your Desktop.
+
 # Usage and Shortcuts
 
 ![alt text](screenshot.png "Title")
@@ -17,19 +21,11 @@ Additionally, you can perform the following actions:
  - Clicking on the RGB or HSV tabs in the color picker will allow you to change the color format.
  - The export button in the history palette exports to Paint.NET's palette format.
  - Ctrl or shift clicking in the history palette allows you to select multiple colors for picking. Some tools, like "Linear Gradient", make use of multiple color selections.
-# Pre-built Windows 11 x86-64 Binary
-The `dist/` folder contains a pre-built .exe for Windows 11 machines.
 
 # Building From Source
 
-The following runs the program using python:
+The following runs the program using python (Recommended version: 3.9):
 ```
 pip install -r requirements.txt
 python app.py
-```
-
-The following builds the program to your local machine in EXE format (Windows only):
-```
-pip install -r requirements.txt
-pyinstaller TiinySwatch.spec
 ```
