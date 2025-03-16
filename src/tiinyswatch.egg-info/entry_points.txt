@@ -1,0 +1,2 @@
+[console_scripts]
+tiinyswatch = tiinyswatch.__main__:main

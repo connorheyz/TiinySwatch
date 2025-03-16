@@ -1,6 +1,4 @@
 from cx_Freeze import setup, Executable
-import sys
-import os
 
 company_name = "Tiiny"
 product_name = "TiinySwatch"
@@ -12,7 +10,7 @@ bdist_msi_options = {
         "keywords": "PySide6",
     },
     # Icon for the installer
-    "install_icon": "TiinySwatch.ico",
+    "install_icon": "assets\\icons\\TiinySwatch.ico",
     "initial_target_dir": rf"C:\\Program Files\\{company_name}\\{product_name}",
     "all_users": True
 }
@@ -25,11 +23,11 @@ setup(name="TiinySwatch",
           "bdist_msi": bdist_msi_options,
       },
       executables=[Executable(
-          "app.py",
+          "src/app.py",
           shortcut_name="Tiiny Swatch",
           shortcut_dir="DesktopFolder",
           base="Win32GUI",
-          icon="TiinySwatch.ico"
+          icon="assets/icons/TiinySwatch.ico"
       )
       ]
       )

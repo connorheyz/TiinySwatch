@@ -1,6 +1,11 @@
-__pycache__/*
 build/*
+dist/*
 **/__pycache__/
 venv/*
-test.py
-test2.py
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw

@@ -1,3 +1,22 @@
+Metadata-Version: 2.1
+Name: tiinyswatch
+Version: 1.0.0
+Summary: A lightweight color picker and color management application
+Author-email: Connor Hayes <connorheyz@gmail.com>
+License: MIT
+Project-URL: repository, https://github.com/connorheyz/TiinySwatch
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: X11 Applications :: Qt
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Multimedia :: Graphics
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+
 # TiinySwatch
 
 A color picker and manager application built with PySide6.
