@@ -1,6 +1,7 @@
 from PySide6.QtCore import Qt, QRect, QPoint, QPointF, QSize
 from PySide6.QtWidgets import QApplication, QDialog
 from PySide6.QtGui import QPainter, QCursor, QColor, QPixmap, QPen
+from PySide6 import QtCore, QtWidgets
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
 from tiinyswatch.ui.styles import DARK_STYLE
@@ -21,13 +22,14 @@ class TransparentOverlay(QDialog):
             self.screenshot_pixmap = QPixmap.fromImage(screenshot)
         else:
             self.screenshot_pixmap = screenshot
-
-        # QCursor.pos() returns logical (CSS) coordinates.
-        self.cursorPos = QCursor.pos()  # Logical coordinates.
+        
         self.dragging = False
         self.startPos = None  # Logical global position.
         self.endPos = None    # Logical global position.
+        self.dpr = self.screenshot_pixmap.devicePixelRatio()
+        self.cursorPos = QCursor.pos().toPointF() * self.dpr
         self.averageColor = None
+        self.selectedColors = []
 
         self.setStyleSheet(DARK_STYLE)
         QApplication.setOverrideCursor(Qt.CrossCursor)
@@ -71,7 +73,7 @@ class TransparentOverlay(QDialog):
             if self.zoomActivated and self.virtualCursorPos is not None:
                 self.startPos = self.virtualCursorPos.toPoint()
             else:
-                self.startPos = event.globalPosition().toPoint()  # Logical global position.
+                self.startPos = self.getEventUpscaledCursorPosition(event)
             self.endPos = self.startPos
             event.accept()
         elif event.button() == Qt.RightButton:
@@ -79,8 +81,11 @@ class TransparentOverlay(QDialog):
         else:
             super().mousePressEvent(event)
 
+    def getEventUpscaledCursorPosition(self, event):
+        return QPoint(round(event.scenePosition().x() * self.dpr), round(event.scenePosition().y() * self.dpr))
+
     def mouseMoveEvent(self, event):
-        self.cursorPos = event.globalPosition().toPoint()  # Logical global position.
+        self.cursorPos = self.getEventUpscaledCursorPosition(event)
         if self.zoomActivated and self.zoomAnchorPos is not None and self.virtualCursorRatio is not None:
             self.virtualCursorPos = self.globalToVirtual(self.cursorPos)
         if self.dragging:
@@ -97,6 +102,7 @@ class TransparentOverlay(QDialog):
         if event.button() == Qt.LeftButton and self.dragging:
             self.dragging = False
             self.calculateAverageColor()
+            modifiers = QtWidgets.QApplication.keyboardModifiers()
             
             # Check if we have an average color from a selection
             if self.averageColor and (self.startPos != self.endPos):
@@ -106,19 +112,18 @@ class TransparentOverlay(QDialog):
                 samplePos = self.virtualCursorPos if (self.zoomActivated and self.virtualCursorPos is not None) else self.cursorPos
                 colorToSave = self.getPixelColor(samplePos)
             
-            if colorToSave:
-                Settings.set("currentColors", [QColorEnhanced.from_qcolor(colorToSave)])
-                for color in Settings.get("currentColors"):
-                    Settings.appendToHistory(color)
-                    if Settings.get("CLIPBOARD"):
-                        ClipboardManager.copyColorToClipboard(color)
-            self.close()
+            self.selectedColors.append(QColorEnhanced.from_qcolor(colorToSave))
+            
+            if not (modifiers & Qt.ControlModifier):
+                self.close()
+            
+            self.update()
         else:
             super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
-        cursor = QCursor.pos()  # Global (logical) coordinate.
+        cursor = self.cursorPos
         if delta > 0:
             if not self.zoomActivated:
                 self.zoomActivated = True
@@ -181,8 +186,7 @@ class TransparentOverlay(QDialog):
     def getPixelColor(self, point):
         if not self.screenshot_pixmap:
             return QColor(0, 0, 0)
-        dpr = self.screenshot_pixmap.devicePixelRatio() or 1.0
-        physicalPoint = QPoint(round(point.x() * dpr), round(point.y() * dpr))
+        physicalPoint = QPoint(round(point.x()), round(point.y()))
         x = max(0, min(physicalPoint.x(), self.screenshot_pixmap.width() - 1))
         y = max(0, min(physicalPoint.y(), self.screenshot_pixmap.height() - 1))
         return self.screenshot_pixmap.toImage().pixelColor(x, y)
@@ -191,13 +195,12 @@ class TransparentOverlay(QDialog):
         if not self.screenshot_pixmap:
             return
 
-        dpr = self.screenshot_pixmap.devicePixelRatio() or 1.0
-        physicalZoomSize = int(self.zoomSize * dpr)
+        physicalZoomSize = int(self.zoomSize)
         srcSize = round(physicalZoomSize / self.zoomFactor)
 
         # Use the virtual cursor (if available) for sampling.
         centerLogical = self.virtualCursorPos if (self.zoomActivated and self.virtualCursorPos is not None) else self.cursorPos
-        physicalCenter = QPoint(round(centerLogical.x() * dpr), round(centerLogical.y() * dpr))
+        physicalCenter = QPoint(round(centerLogical.x()), round(centerLogical.y()))
         srcLeft = physicalCenter.x() - srcSize // 2
         srcTop = physicalCenter.y() - srcSize // 2
         srcRect = QRect(srcLeft, srcTop, srcSize, srcSize)
@@ -206,9 +209,8 @@ class TransparentOverlay(QDialog):
         zoomRegion = self.screenshot_pixmap.copy(srcRect)
         zoomedImage = zoomRegion.scaled(physicalZoomSize, physicalZoomSize,
                                         Qt.IgnoreAspectRatio, Qt.FastTransformation)
-        zoomedImage.setDevicePixelRatio(dpr)
 
-        localCursor = self.mapFromGlobal(self.cursorPos)
+        localCursor = self.mapFromGlobal(self.cursorPos/self.dpr)
         previewPos = QPoint(localCursor.x() - self.zoomSize // 2,
                             localCursor.y() - self.zoomSize // 2)
         previewRect = QRect(previewPos, QSize(self.zoomSize, self.zoomSize))
@@ -230,10 +232,10 @@ class TransparentOverlay(QDialog):
         if self.dragging and self.startPos and self.endPos:
             selLogical = QRect(self.startPos, self.endPos).normalized()
             selPhysical = QRect(
-                round(selLogical.left() * dpr),
-                round(selLogical.top() * dpr),
-                round(selLogical.width() * dpr),
-                round(selLogical.height() * dpr)
+                round(selLogical.left()),
+                round(selLogical.top()),
+                round(selLogical.width()),
+                round(selLogical.height())
             )
             selInSrc = selPhysical.intersected(srcRect)
             if not selInSrc.isEmpty():
@@ -243,15 +245,31 @@ class TransparentOverlay(QDialog):
                 selW = selInSrc.width() * scaleFactor
                 selH = selInSrc.height() * scaleFactor
                 selPreviewRect = QRect(
-                    round(previewPos.x() + selX / dpr),
-                    round(previewPos.y() + selY / dpr),
-                    round(selW / dpr),
-                    round(selH / dpr)
+                    round(previewPos.x() + selX),
+                    round(previewPos.y() + selY),
+                    round(selW),
+                    round(selH)
                 )
                 selectionPen = QPen(Qt.yellow)
                 selectionPen.setWidth(2)
                 painter.setPen(selectionPen)
                 painter.drawRect(selPreviewRect)
+
+    def drawColorBoxes(self, painter, cursorLocal, displayColor, colorLabel):
+        color_square_size = 25
+        color_square_spacing = 5
+        n_colors = len(self.selectedColors) + 1
+        initial_offset = cursorLocal.y() - (n_colors * color_square_size + color_square_spacing)/2.0
+        for i, color in enumerate(self.selectedColors):
+            color_rect = QRect(cursorLocal.x() + 15, initial_offset + i * (color_square_size + color_square_spacing), color_square_size, color_square_size)
+            painter.fillRect(color_rect, color.qcolor)
+            painter.setPen(QPen(Qt.white, 2))
+            painter.drawRect(color_rect)
+        colorBox = QRect(cursorLocal.x() + 15, initial_offset + (n_colors - 1) * (color_square_size + color_square_spacing), color_square_size, color_square_size)
+        painter.fillRect(colorBox, displayColor)
+        painter.setPen(QPen(Qt.white, 2))
+        painter.drawRect(colorBox)
+        painter.drawText(colorBox.x(), colorBox.y() + color_square_size + 15, colorLabel)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -261,8 +279,8 @@ class TransparentOverlay(QDialog):
         painter.fillRect(self.rect(), QColor(0, 0, 0, 100))
 
         if self.dragging and self.startPos and self.endPos:
-            startLocal = self.mapFromGlobal(self.startPos)
-            endLocal = self.mapFromGlobal(self.endPos)
+            startLocal = self.mapFromGlobal(self.startPos/self.dpr)
+            endLocal = self.mapFromGlobal(self.endPos/self.dpr)
             selectionRect = QRect(startLocal, endLocal)
             painter.setPen(QPen(Qt.white, 1))
             painter.setBrush(QColor(255, 255, 255, 50))
@@ -279,22 +297,19 @@ class TransparentOverlay(QDialog):
             samplePos = self.virtualCursorPos if (self.zoomActivated and self.virtualCursorPos is not None) else self.cursorPos
             displayColor = self.getPixelColor(samplePos)
             colorLabel = f"#{displayColor.red():02x}{displayColor.green():02x}{displayColor.blue():02x}"
-
-        previewBoxSize = 25
-        cursorLocal = self.mapFromGlobal(self.cursorPos)
-        colorBox = QRect(cursorLocal.x() + 15, cursorLocal.y() + 15, previewBoxSize, previewBoxSize)
-        if colorBox.right() > self.width() - 5:
-            colorBox.moveLeft(cursorLocal.x() - previewBoxSize - 15)
-        if colorBox.bottom() > self.height() - 5:
-            colorBox.moveTop(cursorLocal.y() - previewBoxSize - 15)
-        painter.fillRect(colorBox, displayColor)
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawRect(colorBox)
-        painter.drawText(colorBox.x(), colorBox.y() + previewBoxSize + 15, colorLabel)
+        cursorLocal = self.mapFromGlobal(self.cursorPos/self.dpr)
+        self.drawColorBoxes(painter, cursorLocal, displayColor, colorLabel)
 
         painter.end()
 
     def closeEvent(self, event):
+        if (len(self.selectedColors) > 0):
+            Settings.set("currentColors", self.selectedColors)
+            Settings.set("selectedIndex", len(self.selectedColors) - 1)
+            for color in Settings.get("currentColors"):
+                Settings.appendToHistory(color)
+                if Settings.get("CLIPBOARD"):
+                    ClipboardManager.copyColorToClipboard(color)
         QApplication.restoreOverrideCursor()
         self.parent.overlay = None
         self.parent.overlayToggled = False

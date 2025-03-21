@@ -7,7 +7,7 @@ from tiinyswatch.utils.pantone_data import PantoneData
 COLOR_SPACES = {
     'lab': {
         'keys': ['L', 'a', 'b'],
-        'ranges': {'L': (0, 100), 'a': (-127, 128), 'b': (-127, 128)},
+        'ranges': [(0, 100), (-127, 128), (-127, 128)],
         'to_xyz': conversions.lab_to_xyz,
         'from_xyz': conversions.xyz_to_lab,
         'default_observer': '2',
@@ -18,7 +18,7 @@ COLOR_SPACES = {
     },
     'oklab': {
         'keys': ['L', 'a', 'b'],
-        'ranges': {'L': (0.0, 1.0), 'a': (-0.5, 0.5), 'b': (-0.5, 0.5)},
+        'ranges': [(0.0, 1.0), (-0.5, 0.5), (-0.5, 0.5)],
         'to_xyz': conversions.oklab_to_xyz,
         'from_xyz': conversions.xyz_to_oklab,
         'default_observer': '2',
@@ -29,7 +29,7 @@ COLOR_SPACES = {
     },
     'xyz': {
         'keys': ['x', 'y', 'z'],
-        'ranges': {'x': (0.0, 1.0), 'y': (0.0, 1.0), 'z': (0.0, 1.0)},
+        'ranges': [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0)],
         'default_observer': '2',
         'default_illuminant': 'd65',
         'has_dirty': False,
@@ -38,7 +38,7 @@ COLOR_SPACES = {
     },
     'xyy': {
         'keys': ['x', 'y', 'Y'],
-        'ranges': {'x': (0.0, 1.0), 'y': (0.0, 1.0), 'Y': (0.0, 1.0)},
+        'ranges': [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0)],
         'to_xyz': conversions.xyy_to_xyz,
         'from_xyz': conversions.xyz_to_xyy,
         'default_observer': '2',
@@ -49,7 +49,7 @@ COLOR_SPACES = {
     },
     'luv': {
         'keys': ['L', 'u', 'v'],
-        'ranges': {'L': (0.0, 1.0), 'u': (0.0, 1.0), 'v': (0.0, 1.0)},
+        'ranges': [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0)],
         'to_xyz': conversions.luv_to_xyz,
         'from_xyz': conversions.xyz_to_luv,
         'default_observer': '2',
@@ -60,7 +60,7 @@ COLOR_SPACES = {
     },
     'adobe_rgb': {
         'keys': ['r', 'g', 'b'],
-        'ranges': {'r': (0.0, 1.0), 'g': (0.0, 1.0), 'b': (0.0, 1.0)},
+        'ranges': [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0)],
         'to_xyz': conversions.adobe_to_xyz,
         'from_xyz': conversions.xyz_to_adobe,
         'has_dirty': True,
@@ -69,7 +69,7 @@ COLOR_SPACES = {
     },
     'itp': {
         'keys': ['i', 't', 'p'],
-        'ranges': {'i': (0.0, 1.0), 't': (-0.5, 0.5), 'p': (-0.5, 0.5)},
+        'ranges': [(0.0, 1.0), (-0.5, 0.5), (-0.5, 0.5)],
         'to_xyz': conversions.itp_to_xyz,
         'from_xyz': conversions.xyz_to_itp,
         'has_dirty': True,
@@ -78,7 +78,7 @@ COLOR_SPACES = {
     },
     'ictcp': {
         'keys': ['i', 't', 'p'],
-        'ranges': {'i': (0.0, 1.0), 't': (-0.5, 0.5), 'p': (-0.5, 0.5)},
+        'ranges': [(0.0, 1.0), (-0.5, 0.5), (-0.5, 0.5)],
         'to_xyz': conversions.ictcp_to_xyz,
         'from_xyz': conversions.xyz_to_ictcp,
         'has_dirty': True,
@@ -87,7 +87,7 @@ COLOR_SPACES = {
     },
     'iab': {
         'keys': ['i', 'a', 'b'],
-        'ranges': {'i': (0, 1.0), 'a': (-1.0, 1.0), 'b': (-1.0, 1.0)},
+        'ranges': [(0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         'to_xyz': conversions.iab_to_xyz,
         'from_xyz': conversions.xyz_to_iab,
         'has_dirty': True,
@@ -96,7 +96,7 @@ COLOR_SPACES = {
     },
     'ipt': {
         'keys': ['i', 'p', 't'],
-        'ranges': {'i': (0.0, 1.0), 'p': (-0.5, 0.5), 't': (-0.5, 0.5)},
+        'ranges': [(0.0, 1.0), (-0.5, 0.5), (-0.5, 0.5)],
         'to_xyz': conversions.ipt_to_xyz,
         'from_xyz': conversions.xyz_to_ipt,
         'has_dirty': True,
@@ -105,7 +105,7 @@ COLOR_SPACES = {
     },
     'hsv': {
         'keys': ['h', 's', 'v'],
-        'ranges': {'h': (0, 359), 's': (0.0, 1.0), 'v': (0.0, 1.0)},
+        'ranges': [(0, 359), (0.0, 1.0), (0.0, 1.0)],
         'to_xyz': conversions.hsv_to_xyz,
         'from_xyz': conversions.xyz_to_hsv,
         'has_dirty': True,
@@ -114,7 +114,7 @@ COLOR_SPACES = {
     },
     'hsl': {
         'keys': ['h', 's', 'l'],
-        'ranges': {'h': (0.0, 360.0), 's': (0.0, 1.0), 'l': (0.0, 1.0)},
+        'ranges': [(0.0, 360.0), (0.0, 1.0), (0.0, 1.0)],
         'to_xyz': conversions.hsl_to_xyz,
         'from_xyz': conversions.xyz_to_hsl,
         'has_dirty': True,
@@ -123,7 +123,7 @@ COLOR_SPACES = {
     },
     'cmyk': {
         'keys': ['c', 'm', 'y', 'k'],
-        'ranges': {'c': (0.0, 1.0), 'm': (0.0, 1.0), 'y': (0.0, 1.0), 'k': (0.0, 1.0)},
+        'ranges': [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)],
         'to_xyz': conversions.cmyk_to_xyz,
         'from_xyz': conversions.xyz_to_cmyk,
         'has_dirty': True,
@@ -132,7 +132,7 @@ COLOR_SPACES = {
     },
     'srgb': {
         'keys': ['r', 'g', 'b'],
-        'ranges': {'r': (0.0, 1.0), 'g': (0.0, 1.0), 'b': (0.0, 1.0)},
+        'ranges': [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0)],
         'to_xyz': conversions.srgb_to_xyz,
         'from_xyz': conversions.xyz_to_srgb,
         'has_dirty': True,
@@ -286,7 +286,7 @@ class QColorEnhanced:
 
     @classmethod
     def _clamp_values(cls, values, space):
-        ranges = list(COLOR_SPACES[space]['ranges'].values())
+        ranges = COLOR_SPACES[space]['ranges']
         mins = np.array([r[0] for r in ranges])
         maxs = np.array([r[1] for r in ranges])
         return np.clip(values, mins, maxs)
@@ -307,7 +307,13 @@ class QColorEnhanced:
     def get_range(cls, space, component=None):
         if space in COLOR_SPACES:
             ranges = COLOR_SPACES[space]['ranges']
-            return ranges[component] if component else ranges
+            if component is None:
+                return ranges
+            try:
+                index = COLOR_SPACES[space]['keys'].index(component)
+                return ranges[index]
+            except (IndexError, TypeError):
+                return None
         return None
 
     @classmethod

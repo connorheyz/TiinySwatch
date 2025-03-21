@@ -389,26 +389,25 @@ class LinearGradientControl(ColorControl):
             return
         # Update the base color for the saturation slider.
         self.color_arc.set_color_from_point(self.saturation_pair._base_color, self.color_arc.arc_peak)
-        self.saturation_pair.set_slider_gradient(self.saturation_pair._base_color, self.project_saturation)
+        self.saturation_pair.set_slider_gradient(self.saturation_pair._base_color, self.preview_saturation)
 
-    def project_saturation(self, color, value):
+    def preview_saturation(self, color, value):
         if self.color_arc is None:
             return
-        point = self.color_arc.project_saturation_value(value)
         rotation = self.rotation_pair.slider.value()
-        point = self.color_arc.rotate_point(point, np.radians(rotation))
+        point = self.color_arc.preview_saturation_value(value, np.radians(rotation))
         self.color_arc.set_color_from_point(color, point)
 
     def update_hue_slider_gradient(self):
         if self.color_arc is None:
             return
         self.color_arc.set_color_from_point(self.rotation_pair._base_color, self.color_arc.arc_peak)
-        self.rotation_pair.set_slider_gradient(self.rotation_pair._base_color, self.project_hue)
+        self.rotation_pair.set_slider_gradient(self.rotation_pair._base_color, self.preview_hue)
 
-    def project_hue(self, color, value):
+    def preview_hue(self, color, value):
         if self.color_arc is None:
             return
-        point = self.color_arc.project_hue_value(value)
+        point = self.color_arc.preview_hue_value(value)
         self.color_arc.set_color_from_point(color, point)
 
     def draw_buttons(self):
@@ -442,7 +441,7 @@ class LinearGradientControl(ColorControl):
         self.discrete_container.setSelectedIndex(index)
 
     def update_colors_from_arc(self, arc: ColorArc):
-        for (point, color) in zip(arc.polyline, self.current_gradient_colors):
+        for (point, color) in zip(arc.shape, self.current_gradient_colors):
             arc.set_color_from_point(color, point)
 
     def rotate_arc(self):
@@ -450,7 +449,7 @@ class LinearGradientControl(ColorControl):
             return
         rot_val = self.rotation_pair.slider.value()
         # Rotate the entire arc.
-        rot_color_arc = self.color_arc.rotate_arc(math.radians(rot_val))
+        rot_color_arc = self.color_arc.apply_hue_value(math.radians(rot_val))
         self.update_saturation_slider_gradient()
         self.update_gradients(rot_color_arc)
 
@@ -631,13 +630,13 @@ class ColorTetraControl(ColorControl):
         self.compute_tetra()
 
     def update_colors_from_tetra(self, shape):
-        if shape is None or shape.polyline is None:
+        if shape is None or shape.shape is None:
             # If we don't have a valid shape, just use default colors
             for color in self.current_gradient_colors:
                 color.set_tuple('iab', [0.5, 0, 0])  # Mid-gray
             return
 
-        for (point, color) in zip(shape.polyline, self.current_gradient_colors):
+        for (point, color) in zip(shape.shape, self.current_gradient_colors):
             shape.set_color_from_point(color, point)
 
     def update_gradients(self, tetra=None):
@@ -659,14 +658,7 @@ class ColorTetraControl(ColorControl):
             self.rotation_pair.set_handle_color(self.current_colors[0])
             
         # Update slider gradients
-        self.update_saturation_slider_gradient()
         self.compute_tetra()
-
-    def update_saturation_slider_gradient(self):
-        if self.color_tetra is None:
-            return
-        # Update the base color for the saturation slider
-        self.color_tetra.set_color_from_point(self.saturation_pair._base_color, self.color_tetra.arc_peak)
 
     def swatch_clicked(self, index):
         """

@@ -32,7 +32,7 @@ def format_color_generic(color, config):
     values = color.get_tuple(space)
     
     target_ranges = config.get("target_ranges")
-    source_ranges = list(QColorEnhanced.get_range(space).values())
+    source_ranges = QColorEnhanced.get_range(space)
     
     if target_ranges is not None:
         scaled_values = []
