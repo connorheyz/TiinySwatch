@@ -1,25 +1,24 @@
 import numpy as np
 import math
-from .color_shape import ColorShape
+from .color_shape import ColorShape, create_var
 from tiinyswatch.color.color_enhanced import QColorEnhanced
 from .color_geometry_tools import ColorGeometryTools
 
 class ColorTetra(ColorShape):
     """
     Encapsulates a color tetrahedron in 3D space.
-    
-    Properties:
-      - polyline: a (4 x 3) NumPy array of points representing the tetrahedron vertices.
-      - tetra_origin: the origin of the tetrahedron.
     """
-    
-    def __init__(self, color=None, saturation=1.0, rotation=0.0):
-        super().__init__()
-        if color is None:
-            return
-            
+
+    saturation = create_var("saturation", float, disp_name="Sat.", default=1.0, range=(1.0, 3.0))
+    hue = create_var("hue", float, disp_name="Hue.", default=0.0, range=(0.0, np.pi * 2.0))
+
+    def compute_from_seed(self, colors):
         # Compute the apex point from the color.
+        color = colors[0]
         A = self.color_to_point(color)
+        saturation = self.get_value("saturation")
+        rotation = self.get_value("hue")
+
         L = saturation * 0.25               # Edge length of the tetrahedron
         R_length = L / math.sqrt(3)         # Circumradius of the base triangle
         h = math.sqrt(2/3) * L              # Height from the base to the apex
@@ -72,10 +71,8 @@ class ColorTetra(ColorShape):
         vertices = [A] + base_points
         
         self._shape = np.array(vertices)
-
-    @property
-    def arc_axis(self):
-        return self._arc_axis
+        return self._shape
+        
 
 class TwoColorTetra(ColorShape):
     """
@@ -86,16 +83,15 @@ class TwoColorTetra(ColorShape):
       - arc_axis: normalized vector from colorA to colorB (fixed edge direction).
       - arc_peak: the apex point of the tetrahedron.
     """
-    
-    def __init__(self, colorA=None, colorB=None, saturation=0.0, rotation=0.0):
-        super().__init__()
-        if colorA is None or colorB is None:
-            return
-            
+    edge = create_var("edge", int, disp_name="Fixed edge:", default=1, range=(1, 6))
+    hue = create_var("hue", float, disp_name="Hue.", default=0.0, range=(0.0, np.pi * 2.0))
+
+    def compute_from_seed(self, colors):
         # Convert colors to points.
-        A = self.color_to_point(colorA)
-        B = self.color_to_point(colorB)
-        
+        A = self.color_to_point(colors[0])
+        B = self.color_to_point(colors[-1])
+        edge_val = self.get_value("edge")
+        rotation = self.get_value("hue")
         # The fixed edge vector becomes our rotation axis.
         edge = B - A
         edge_length = np.linalg.norm(edge)
@@ -132,7 +128,7 @@ class TwoColorTetra(ColorShape):
             base_vertices.append(M + v_rot)
         
         # The saturation parameter determines which vertices are A and B.
-        edge_index = int(saturation * 6) % 6
+        edge_index = edge_val - 1
         vertex_order = [
             [0, 1, 2, 3],  # A-B is edge 0-1.
             [0, 2, 1, 3],  # A-B is edge 0-2.
@@ -146,3 +142,6 @@ class TwoColorTetra(ColorShape):
         vertices[1] = B  # Ensure that the second vertex is always B.
         
         self._shape = np.array(vertices)
+        return self._shape
+            
+       

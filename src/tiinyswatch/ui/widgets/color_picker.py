@@ -12,7 +12,8 @@ from tiinyswatch.utils.notification_manager import NotificationManager
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
 from tiinyswatch.color import QColorEnhanced
 from tiinyswatch.ui.widgets.history_palette import HistoryPalette
-from tiinyswatch.ui.widgets.color_controls import create_slider_classes_for_format, ComplementsControl, LinearGradientControl, PantoneControl, ColorTetraControl
+from tiinyswatch.ui.controls.color_controls import create_slider_classes_for_format
+from tiinyswatch.ui.controls import ComplementsControl, LinearGradientControl, PantoneControl, ColorTetraControl
 
 from tiinyswatch.ui.widgets.color_widgets import ExpandableColorBlocksWidget, ColorBlock, CircularButton, LineEdit, NotificationBanner
 
@@ -278,13 +279,8 @@ class ColorPicker(QWidget):
 
     def updateColorPreview(self, *args):
         current_colors = Settings.get("currentColors") or []
-        self.previewContainer.clearBlocks()
-        for index, color in enumerate(current_colors):
-            block = ColorBlock(color,
-                               on_click=partial(self.onSegmentClicked, index),
-                               parent=self.previewContainer)
-            self.previewContainer.addBlock(block)
-        self.previewContainer.finalizeBlocks()
+        self.previewContainer.initializeBlocks(current_colors)
+        self.previewContainer.on_swatch_clicked = self.onSegmentClicked
 
     def onHexChanged(self, text):
         color = QColorEnhanced(QColor(text))
@@ -371,7 +367,7 @@ class ColorPicker(QWidget):
             self.parent.overlay = None
             self.parent.pickerToggled = False
 
-    def onSegmentClicked(self, index):
+    def onSegmentClicked(self, index, _):
         Settings.set('selectedIndex', index)
         current_colors = Settings.get("currentColors")
         if index < len(current_colors):
