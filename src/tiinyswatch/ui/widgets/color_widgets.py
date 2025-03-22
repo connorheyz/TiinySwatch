@@ -137,13 +137,14 @@ class SliderSpinBoxPair(QWidget):
         self.base_style = style
         self.slider.setStyleSheet(style)
 
-    def set_slider_gradient(self, base_color: QColorEnhanced, set_fn):
+    def set_slider_gradient(self, set_fn, base_color=None):
         """
         Generates and applies a QSS gradient to the slider’s groove.
         The set_fn function is used to modify a color based on a test value.
         """
         stops = []
-        self._base_color.copy_values(base_color)
+        if base_color is not None:
+            self._base_color.copy_values(base_color)
         for i in range(self.steps + 1):
             fraction = i / float(self.steps)
             test_val = self.actual_range[0] + fraction * (self.actual_range[1] - self.actual_range[0])
@@ -164,6 +165,65 @@ class SliderSpinBoxPair(QWidget):
         if self.label:
             self.label.setFixedWidth(width)
 
+class LabeledSpinbox(QWidget):
+    """
+    A composite widget that contains an optional label, a slider, and a spinbox.
+    The spinbox has a fixed width and the slider expands.
+    It emits valueChanged(actual_value) whenever the value changes.
+    """
+    valueChanged = Signal(int)
+    
+    def __init__(
+        self,  
+        spinbox_width=60, 
+        label_text=None, 
+        parent=None
+    ):
+        super().__init__(parent)
+        self.label_text = label_text
+        self.base_style = ""
+        self._base_color = QColorEnhanced()
+        self._init_ui(spinbox_width)
+    
+    def _init_ui(self, spinbox_width):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # If a label is provided, create and add it.
+        if self.label_text:
+            self.label = QLabel(self.label_text, self)
+            layout.addWidget(self.label)
+        else:
+            self.label = None
+    
+        self.spinbox = QSpinBox(self)
+        spacer = QWidget(self)
+        
+        self.spinbox.setFixedWidth(spinbox_width)
+        
+        layout.addWidget(spacer, 1)
+        layout.addWidget(self.spinbox, 0)
+        
+        self.spinbox.valueChanged.connect(self._emit_value)
+    
+    def _emit_value(self, val):
+        self.valueChanged.emit(val)
+
+    def set_value(self, val):
+        self.spinbox.setValue(val)
+        
+    def setLabelWidth(self, width):
+        """Sets the label width if the label exists."""
+        if self.label:
+            self.label.setFixedWidth(width)
+
+    def get_value(self):
+        return self.spinbox.value()
+    
+    def set_range(self, min, max):
+        self.spinbox.setMinimum(min)
+        self.spinbox.setMaximum(max)
+
 class ColorBlock(QPushButton):
     """
     A unified clickable widget that displays a block of color.
@@ -177,7 +237,6 @@ class ColorBlock(QPushButton):
 
         self.setCursor(Qt.PointingHandCursor)
         self.update_style()
-
 
     def set_color(self, color):
         self.color = color
@@ -258,6 +317,7 @@ class ExpandableColorBlocksWidget(QWidget):
         self.selectedIndex = None
         self.distAnimation = None
         self._distProgress = 0.0
+        self.on_swatch_clicked = None
 
         self.startWidths = []
         self.endWidths = []
@@ -440,8 +500,34 @@ class ExpandableColorBlocksWidget(QWidget):
         for i, block in enumerate(self.blocks):
             block.setFixedWidth(newWidths[i])
 
+    def swatch_clicked(self, index):
+        if self.on_swatch_clicked:
+            self.on_swatch_clicked(index, self.blocks[index].color)
+
+    def initializeBlocks(self, colors):
+        self.clearBlocks()
+        for idx in range(len(colors)):
+            block = ColorBlock(
+                colors[idx],
+                on_click=lambda c, i=idx: self.swatch_clicked(i),
+                parent=self
+            )
+            self.addBlock(block)
+        self.finalizeBlocks()
+
+    def hide_colors(self):
+        for block in self.blocks:
+            block.hideText()
+
+    def update_colors(self, colors):
+        for block, color in zip(self.blocks, colors):
+            block.set_color(color)
+
     def getBlocks(self):
         return self.blocks
+    
+    def get_colors(self):
+        return [block.color for block in self.blocks]
     
 class CircularButton(QPushButton):
     def __init__(self, text="", parent=None):

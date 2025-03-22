@@ -62,3 +62,11 @@ class ColorGeometryTools:
         if norm_axis < 1e-12:
             return np.array([1.0, 0.0, 0.0])
         return axis / norm_axis
+    
+    @staticmethod
+    def get_normalized_direction(vA, vB):
+        direction = vB-vA
+        norm_axis = np.linalg.norm(direction)
+        if norm_axis < 1e-12:
+            return np.array([1.0, 0.0, 0.0])
+        return direction/norm_axis
