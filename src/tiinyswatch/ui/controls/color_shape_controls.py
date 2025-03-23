@@ -39,11 +39,12 @@ class ColorShapeControl(ColorControl):
         """
         # Update the shape class and create a new shape instance.
         self.shape_class = new_class
-        self._shape_instance = new_class()
+        new_instance = new_class()
+        new_instance.copy_variable_values_from(self._shape_instance)
+        self._shape_instance = new_instance
         
         # Clear existing variable controls and callbacks.
         self.var_controls.clear()
-        self.change_callbacks.clear()
         
         # Clear all widgets from the container's layout.
         if hasattr(self, "main_layout"):
@@ -93,12 +94,18 @@ class ColorShapeControl(ColorControl):
                 )
                 control.steps = 5
                 control.setLabelWidth(25)
-                control.set_value(var.value)
+                if self._shape_instance._variables[var.name].value is not None:
+                    control.set_value(self._shape_instance.get_value(var.name))
+                else:
+                    control.set_value(var.value)
                 control.valueChanged.connect(lambda value, name=var.name: self.on_variable_changed(name, value))
             elif var.var_type == int:
                 control = LabeledSpinbox(label_text=var.disp_name,parent=self.container)
                 control.setLabelWidth(75)
-                control.set_value(var.value)
+                if self._shape_instance._variables[var.name].value is not None:
+                    control.set_value(self._shape_instance.get_value(var.name))
+                else:
+                    control.set_value(var.value)
                 control.set_range(effective_range[0], effective_range[1])
                 control.valueChanged.connect(lambda value, name=var.name: self.on_variable_changed(name, value))
             else:

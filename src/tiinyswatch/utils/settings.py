@@ -207,4 +207,4 @@ class Settings:
     def getCurrentColor(cls) -> Optional[QColorEnhanced]:
         """Get the currently selected color."""
         index = cls.get('selectedIndex', 0)
-        return cls.getColor(index)
+        return cls.getColor(index) or QColorEnhanced()

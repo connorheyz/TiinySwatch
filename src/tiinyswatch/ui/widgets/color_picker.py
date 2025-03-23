@@ -60,7 +60,7 @@ class ColorPicker(QWidget):
         self.lastMousePosition = None
 
         if not Settings.get("currentColors"):
-            Settings.set("currentColors")
+            Settings.set("currentColors", [QColorEnhanced()])
 
         # Remove now-unneeded previewSegments & animation properties.
         # The preview will be handled by ExpandableColorBlocksWidget.

@@ -41,12 +41,28 @@ def create_var(name, var_type, preview=None, apply=None, disp_name=None, default
 
 class ColorShapeMeta(type):
     def __new__(cls, name, bases, attrs):
-        registered = []
+        # Collect new variables from this class
+        new_vars = {}
         for key, value in list(attrs.items()):
             if isinstance(value, ColorShapeVariable):
-                registered.append(value)
-        attrs['_registered_variables'] = registered
+                new_vars[value.name] = value
+
+        # Start with inherited registered variables from base classes
+        inherited_vars = {}
+        for base in bases:
+            base_vars = getattr(base, '_registered_variables', [])
+            for var in base_vars:
+                # Use .copy() if you want deep copies per subclass
+                inherited_vars[var.name] = var
+
+        # Override inherited vars with newly defined ones
+        inherited_vars.update(new_vars)
+
+        # Save as list on the class
+        attrs['_registered_variables'] = list(inherited_vars.values())
+
         return super().__new__(cls, name, bases, attrs)
+
 
 # -------------------------------------------------------------------
 # Base class for color shapes
@@ -56,6 +72,7 @@ class ColorShape(metaclass=ColorShapeMeta):
     def __init__(self, colors=None):
         self._format = "iab"
         self._shape = np.array([])
+        self._color_seed = None
         self.init_variables()
         if colors is not None:
             self.set_color_seed(colors)
@@ -128,6 +145,12 @@ class ColorShape(metaclass=ColorShapeMeta):
             variable.value = value
             if variable.apply_func is None:
                 self._shape = self.compute_from_seed(self._color_seed)
+
+    def copy_variable_values_from(self, other_shape):
+        # Copy values from other_shape's variables to this shape's variables if they share the same name
+        for var_name, var in self._variables.items():
+            if var_name in other_shape._variables:
+                var.value = other_shape._variables[var_name].value
 
 
     # Subclasses must implement this
