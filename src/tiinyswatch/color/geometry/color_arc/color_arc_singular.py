@@ -5,15 +5,6 @@ from tiinyswatch.color.geometry.color_geometry_tools import ColorGeometryTools
 from tiinyswatch.color.geometry.color_arc.color_arc import ColorArc
 from tiinyswatch.color.geometry.color_shape import create_var
 class ColorArcSingular(ColorArc):
-
-    saturation = create_var("saturation", float,
-                           preview=lambda inst, val: inst.preview_saturation_value(val),
-                           disp_name="Sat.", default=1.0, range=(1.0, 3.0))
-    hue = create_var("hue", float,
-                      preview=lambda inst, val: inst.preview_hue_value(val),
-                      apply=lambda inst, pts, val: inst.apply_hue_value(pts, val),
-                      disp_name="Hue.", default=0.0, range=(0.0, np.pi * 2.0))
-    n = create_var("n", int, disp_name="Points:", default=5, range=(1, 12))
     
     def __init__(self, colors=None):
         super().__init__(colors=colors)

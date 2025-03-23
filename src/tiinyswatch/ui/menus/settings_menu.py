@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QMenu, QInputDialog
 from PySide6.QtGui import QAction, QActionGroup
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
+from tiinyswatch.color.color_enhanced import QColorEnhanced
 
 CHANGE_KEYBIND_TITLE = "Change Keybind"
 CHANGE_KEYBIND_PROMPT = "Enter the new key:"
@@ -179,7 +180,7 @@ class SettingsMenu(QMenu):
         """
         colors = Settings.get("currentColors")
         if len(colors) < 1:
-            colors = [QColorEnhanced(255, 255, 255)]  # fallback
+            colors = [QColorEnhanced()]  # fallback
 
         # Generate text from ClipboardManager's format templates
         rgbText = ClipboardManager.getFormattedColor(colors[0], "RGB") + " (rgb)"
