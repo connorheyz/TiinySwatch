@@ -171,11 +171,13 @@ class QColorEnhanced:
             if components.size != expected:
                 raise ValueError(f"Expected {expected} components for {space}, got {components.size}.")
             self.set_tuple(space, components)
+            self._current_source = space
         else:
             self.set_tuple('srgb', [0.0, 0.0, 0.0])
+            self._current_source = 'srgb'
 
         self._alpha = kwargs.get('alpha', 1.0)
-        self._current_source = 'srgb'  # Initialize the current source property
+        
 
     @classmethod
     def from_qcolor(cls, qcolor: QColor):
@@ -371,6 +373,7 @@ class QColorEnhanced:
 
     def set_pantone(self, name):
         xyz_value = PantoneData.get_xyz(name)
+        print("set_pantone", name, xyz_value)
         if xyz_value:
             self.set_tuple('xyz', xyz_value)
 
@@ -405,7 +408,7 @@ class QColorEnhanced:
         return COLOR_SPACES[space]['black_point']
 
     @classmethod
-    def get_gray_point(cls, space):
+    def get_centroid(cls, space):
         """Get the midpoint between white and black points for a given color space."""
         white = cls.get_white_point(space)
         black = cls.get_black_point(space)

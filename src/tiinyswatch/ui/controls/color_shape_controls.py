@@ -288,6 +288,7 @@ class LinearGradientControl(ColorShapeControl):
 class ColorTetraControl(ColorShapeControl):
     def __init__(self):
         super().__init__(shape_class=ColorTetra, name="ColorTetra")
+        self.change_callbacks["n"] = self.draw_buttons
         self.use_single = False  # Set to False to handle multiple colors like LinearGradientControl
 
     def initialize_shape_preview(self, layout):
@@ -317,7 +318,7 @@ class ColorTetraControl(ColorShapeControl):
         Called whenever number-of-colors changes. Clears the container and re-adds
         new ColorBlocks with the current gradient colors.
         """
-        num_buttons = 4
+        num_buttons = self._shape_instance.get_value("n")
         colors = [QColorEnhanced() for _ in range(num_buttons)]
         self.discrete_container.initializeBlocks(colors)
         self.discrete_container.on_swatch_clicked = self.swatch_clicked

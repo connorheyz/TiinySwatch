@@ -109,7 +109,7 @@ class ColorArc(ColorShape):
         if math.isclose(saturation, 1.0, abs_tol=1e-10):
             return 0.0
         d_ref = np.linalg.norm(QColorEnhanced.get_black_point(self.format) -
-                                QColorEnhanced.get_gray_point(self.format))
+                                self.get_format_centroid())
         effective_saturation = 1 + (saturation - 1) * (d_ref / d)
         x = effective_saturation - 1.0
         params = self.RATIONAL_PARAMS

@@ -152,6 +152,8 @@ class ColorShape(metaclass=ColorShapeMeta):
             if var_name in other_shape._variables:
                 var.value = other_shape._variables[var_name].value
 
+    def get_format_centroid(self):
+        return QColorEnhanced.get_centroid(self.format)
 
     # Subclasses must implement this
     def compute_from_seed(self, colors):
