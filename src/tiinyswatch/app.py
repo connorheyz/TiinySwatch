@@ -37,6 +37,7 @@ class App(QMainWindow):
         Settings.load()
         self.keybindManager = KeybindManager.initialize(self)
 
+        # Initialize but don't load data yet - it will load on demand
         PantoneData.initialize()
         NotificationManager.initialize()
 

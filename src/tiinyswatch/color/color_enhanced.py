@@ -380,7 +380,31 @@ class QColorEnhanced:
     @classmethod
     def _initialize_pantone_iab(cls):
         if cls._pantone_iab_values is None:
-            xyz_candidates = np.array(PantoneData.xyz_values)
+            # Get XYZ values from PantoneData, ensuring it's a proper 2D array
+            xyz_data = PantoneData.get_xyz_values()
+            
+            # Check if we actually got data and it's in the right format
+            if not xyz_data or len(xyz_data) == 0:
+                print("Warning: No Pantone XYZ data available")
+                # Set empty arrays as fallback
+                cls._pantone_iab_values = np.array([])
+                return
+                
+            # Convert to proper numpy array with correct shape for processing
+            xyz_candidates = np.array(xyz_data, dtype=float)
+            
+            # Ensure we have a 2D array (n_colors, 3)
+            if xyz_candidates.ndim != 2:
+                # Reshape if it's a flattened or weird-shaped array
+                try:
+                    xyz_candidates = xyz_candidates.reshape(-1, 3)
+                except:
+                    print("Error: Cannot reshape Pantone XYZ data to expected format")
+                    # Set empty arrays as fallback
+                    cls._pantone_iab_values = np.array([])
+                    return
+            
+            # Convert each XYZ value to IAB
             cls._pantone_iab_values = np.array([conversions.xyz_to_iab(c) for c in xyz_candidates])
 
     @classmethod

@@ -156,6 +156,8 @@ class ColorShapeControl(ColorControl):
         """Called externally to update seed colors."""
         if not colors:
             return
+        if not isinstance(colors, list):
+            colors = [colors]
         self.current_colors = colors
         self.pre_compute_hooks()
         self._shape_instance.set_color_seed(self.current_colors)
@@ -289,7 +291,7 @@ class ColorTetraControl(ColorShapeControl):
     def __init__(self):
         super().__init__(shape_class=ColorTetra, name="ColorTetra")
         self.change_callbacks["n"] = self.draw_buttons
-        self.use_single = False  # Set to False to handle multiple colors like LinearGradientControl
+        self.use_single = True  # Set to False to handle multiple colors like LinearGradientControl
 
     def initialize_shape_preview(self, layout):
         preview_container = QWidget(self.container)
@@ -305,13 +307,6 @@ class ColorTetraControl(ColorShapeControl):
     def update_shape_preview(self, shape_points):
         shape_colors = [self._shape_instance.point_to_color(point) for point in shape_points]
         self.discrete_container.update_colors(shape_colors)
-
-    def pre_compute_hooks(self):
-        colors = self.current_colors
-        if self.shape_class == TwoColorTetra and len(colors) == 1:
-            self.change_shape_class(ColorTetra)
-        elif self.shape_class == ColorTetra and len(colors) > 1:
-            self.change_shape_class(TwoColorTetra)
 
     def draw_buttons(self):
         """
