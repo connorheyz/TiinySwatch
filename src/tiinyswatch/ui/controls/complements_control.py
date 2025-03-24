@@ -9,8 +9,9 @@ class ComplementsControl(ColorControl):
     using rows of ColorBlock instances.
     """
     def __init__(self):
-        super().__init__(name="Complements", actual_range=(0, 1), ui_range=(0, 1), steps=1)
+        super().__init__(name="Complements")
         self.blocks = {"complementary": [], "triadic": [], "tetradic": []}
+        self.use_single = True
 
     def create_widgets(self, parent: QWidget):
         container = QWidget(parent)

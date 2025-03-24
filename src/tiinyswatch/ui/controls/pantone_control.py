@@ -10,14 +10,20 @@ class PantoneControl(ColorControl):
     """
     def __init__(self):
         super().__init__(name="PantoneColor")
+        self.use_single = True
 
     def create_widgets(self, parent: QWidget):
-        self.preview = ColorBlock(QColorEnhanced(), parent=parent)
+        self.preview = ColorBlock(QColorEnhanced(), parent=parent, on_click=self.handle_block_click)
         self.preview.setFixedSize(40, 25)
         self.text_input = LineEdit(parent)
         self.text_input.setPlaceholderText("Enter Pantone name")
         self.widgets = [self.preview, self.text_input]
         return self.widgets
+    
+    def handle_block_click(self, color):
+        if self.on_value_changed_callback:
+            self.on_value_changed_callback(color)
+        self.update_widgets(color)
 
     def update_widgets(self, color):
         pantone_name = self.get_value(color)
@@ -39,4 +45,4 @@ class PantoneControl(ColorControl):
         return color.get_pantone()
 
     def set_value(self, color, value):
-        color.set_pantone(value)
+        color.copy_values(value)
