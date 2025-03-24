@@ -2,7 +2,7 @@
 Main application class for TiinySwatch.
 """
 
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QTimer
 from PySide6.QtWidgets import QMainWindow, QSystemTrayIcon
 from PySide6.QtGui import (QIcon, QPixmap, QPainter, QCursor, QGuiApplication, QBrush)
 from typing import Optional
@@ -35,32 +35,43 @@ class App(QMainWindow):
         """Initialize the application and its components."""
         super().__init__()
         Settings.load()
+        
+        # Initialize managers with lazy loading where possible
         self.keybindManager = KeybindManager.initialize(self)
-
-        # Initialize but don't load data yet - it will load on demand
-        PantoneData.initialize()
+        PantoneData.initialize()  # Already optimized for lazy loading
         NotificationManager.initialize()
 
-        self.colorPicker: Optional[ColorPicker] = None
-        self.overlay: Optional[TransparentOverlay] = None
-        self.pickerToggled: bool = False
-        self.overlayToggled: bool = False
+        # Setup component references without instantiating them yet
+        self.colorPicker = None
+        self.overlay = None
+        self.pickerToggled = False
+        self.overlayToggled = False
+        
+        # Apply styles
         self.setStyleSheet(DARK_STYLE)
         
-        self.initializeUI()
+        # We'll initialize UI in a slightly staggered way
+        # 1. First create the minimal required UI for the app to appear responsive
+        self.initializeMinimalUI()
+        
+        # 2. Then connect signals needed for core functionality
         self.setupSignals()
-        self.setupHotkeys()
+        
+        # 3. Finally setup hotkeys which might take a bit more time
+        # Do this in the next event loop iteration to let the UI appear first
+        QTimer.singleShot(100, self.setupHotkeys)
 
-    def initializeUI(self) -> None:
-        """Initialize the main UI components."""
+    def initializeMinimalUI(self) -> None:
+        """Initialize just the minimal UI components needed to start."""
         self.setWindowTitle('TiinySwatch')
         self.setGeometry(*self.DEFAULT_WINDOW_GEOMETRY)
         
-        # Setup system tray
+        # Setup system tray - this is essential
         self.trayIcon = QSystemTrayIcon(self)
         self.trayIcon.setIcon(self.createColoredIcon(Settings.getCurrentColor()))
         self.trayIcon.activated.connect(self.onTrayActivation)
         
+        # Create the tray menu but delay building complex menu items
         self.setupTrayMenu()
         self.trayIcon.show()
 
