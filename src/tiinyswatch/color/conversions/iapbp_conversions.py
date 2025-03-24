@@ -1,6 +1,3 @@
-from colormath.color_objects import (
-    XYZColor
-)
 import numpy as np
 
 _M1_IAB = np.array([
@@ -30,7 +27,7 @@ def _sa_pq_transfer(y):
     Apply the SA-PQ transfer function element-wise.
     y is assumed to be the LMS value scaled by LA.
     Equation: f_SA-PQ(Y) = ((c1 + c2 * Y^(m)) / (1 + c3 * Y^(m)))^(n)
-     """
+    """
     c1, c2, c3, m, n = _SA_PQ_CONSTS
     numerator = c1 + c2 * np.power(y, m)
     denominator = 1 + c3 * np.power(y, m)
@@ -53,8 +50,9 @@ def _sa_pq_transfer_inverse(z):
     result = np.sign(y_m) * np.power(np.abs(y_m), 1.0 / m)
     return result
 
-def xyz_to_iab(xyz_array, **kwargs):
 
+def xyz_to_iab(xyz_array, **kwargs):
+    """Convert XYZ to IAB color space."""
     denormalized_xyz = xyz_array / REF_WHITE 
     xyz_h = np.append(denormalized_xyz, 1.0).reshape(4, 1)
     transformed_xyz = _M1_IAB @ xyz_h
@@ -62,35 +60,35 @@ def xyz_to_iab(xyz_array, **kwargs):
     lms = transformed_xyz[:3, 0]
     lms_prime = _sa_pq_transfer(lms)
     lms_prime_h = np.append(lms_prime, 1.0).reshape(4, 1)
-        
+    
     transformed_lms = _M2_IAB @ lms_prime_h
     transformed_lms /= transformed_lms[3, 0]
-        
+    
     iab = transformed_lms[:3, 0]
     return iab
 
 
 def iab_to_xyz(iab_array, **kwargs):
-
+    """Convert IAB to XYZ color space."""
     # Convert IAPBP coordinates to homogeneous column vector
     iab_h = np.append(np.array(iab_array), 1.0).reshape(4, 1)
-        
+    
     # Invert the second transformation (M2)
     lms_prime_h = _M2_IAB_inv @ iab_h
     lms_prime_h /= lms_prime_h[3, 0]
     lms_prime = lms_prime_h[:3, 0]
-        
+    
     # Invert the SA-PQ transfer function
     lms = _sa_pq_transfer_inverse(lms_prime)
-        
+    
     # Convert LMS back to homogeneous coordinates
     lms_h = np.append(lms, 1.0).reshape(4, 1)
-        
+    
     xyz_h = _M1_IAB_inv @ lms_h
     xyz_h /= xyz_h[3, 0]
-        
+    
     xyz_normalized = xyz_h[:3, 0]
-        
+    
     recovered_xyz = xyz_normalized * REF_WHITE 
-        
+    
     return recovered_xyz

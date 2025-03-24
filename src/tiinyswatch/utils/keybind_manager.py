@@ -24,13 +24,35 @@ VIRTUAL_KEY_CODES = {
     '5': 0x35, '6': 0x36, '7': 0x37, '8': 0x38, '9': 0x39
 }
 
-class HotkeyHandler(QWidget):
+class KeybindManager(QWidget):
     hotkey_triggered = Signal(int)
+    KEYBIND_KEYS = ["PICK_KEYBIND", "TOGGLE_KEYBIND", "HISTORY_KEYBIND"]
     
     def __init__(self):
         super().__init__()
-        self.hotkey_ids = {}
+        self.hotkey_ids = {}  # Maps hotkey IDs to (vk, modifiers) tuples
         self.next_id = 1
+        self.bindings = {}    # Maps setting keys to hotkey IDs
+        self.callbacks = {}   # Maps setting keys to callback functions
+        
+        # Connect the signal to our own handler
+        self.hotkey_triggered.connect(self.handle_hotkey)
+    
+    @classmethod
+    def initialize(cls, parent):
+        """Initialize the keybind manager and register all hotkeys."""
+        instance = cls()
+        instance.setParent(parent)
+        
+        # Register all keybinds from settings
+        for key in cls.KEYBIND_KEYS:
+            instance.register_binding(key)
+        
+        # Listen for setting changes to update keybinds
+        for key in cls.KEYBIND_KEYS:
+            Settings.addListener("SET", key, lambda new_value, k=key: instance.update_binding(k, new_value))
+        
+        return instance
     
     def register_hotkey(self, vk, modifiers):
         """Register a hotkey with Windows and return its ID."""
@@ -57,32 +79,6 @@ class HotkeyHandler(QWidget):
                 self.hotkey_triggered.emit(hotkey_id)
                 return True, 0
         return False, 0
-
-class KeybindManager(QWidget):
-    KEYBIND_KEYS = ["PICK_KEYBIND", "TOGGLE_KEYBIND", "HISTORY_KEYBIND"]
-    
-    def __init__(self):
-        super().__init__()
-        self.handler = HotkeyHandler()
-        self.handler.hotkey_triggered.connect(self.handle_hotkey)
-        self.bindings = {}  # Maps setting keys to hotkey IDs
-        self.callbacks = {}  # Maps setting keys to callback functions
-    
-    @classmethod
-    def initialize(cls, parent):
-        """Initialize the keybind manager and register all hotkeys."""
-        instance = cls()
-        instance.setParent(parent)
-        
-        # Register all keybinds from settings
-        for key in cls.KEYBIND_KEYS:
-            instance.register_binding(key)
-        
-        # Listen for setting changes to update keybinds
-        for key in cls.KEYBIND_KEYS:
-            Settings.addListener("SET", key, lambda new_value, k=key: instance.update_binding(k, new_value))
-        
-        return instance
     
     def parse_hotkey(self, hotkey_str):
         """Parse a hotkey string into modifiers and virtual key code."""
@@ -144,14 +140,14 @@ class KeybindManager(QWidget):
             return
         
         # Register the hotkey
-        hotkey_id = self.handler.register_hotkey(vk, modifiers)
+        hotkey_id = self.register_hotkey(vk, modifiers)
         if hotkey_id:
             self.bindings[key] = hotkey_id
     
     def unregister_binding(self, key):
         """Unregister a hotkey binding for a setting key."""
         if key in self.bindings:
-            self.handler.unregister_hotkey(self.bindings[key])
+            self.unregister_hotkey(self.bindings[key])
             del self.bindings[key]
     
     def bindKey(self, key, callback):
