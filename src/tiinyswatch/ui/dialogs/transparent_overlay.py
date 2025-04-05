@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QRect, QPoint, QPointF, QSize
 from PySide6.QtWidgets import QApplication, QDialog
 from PySide6.QtGui import QPainter, QCursor, QColor, QPixmap, QPen
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtWidgets
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
 from tiinyswatch.ui.styles import DARK_STYLE

@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QSpinBox, QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLayout, QSizePolicy
+from PySide6.QtWidgets import QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLayout, QSizePolicy
 from tiinyswatch.ui.widgets.color_widgets import ClickableLineEdit, ExpandableColorBlocksWidget, SliderSpinBoxPair, LabeledSpinbox
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
 from tiinyswatch.color import QColorEnhanced

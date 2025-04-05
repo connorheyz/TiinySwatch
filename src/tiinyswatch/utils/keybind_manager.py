@@ -34,6 +34,8 @@ class KeybindManager(QWidget):
         self.next_id = 1
         self.bindings = {}    # Maps setting keys to hotkey IDs
         self.callbacks = {}   # Maps setting keys to callback functions
+        self.signals_enabled = True  # Flag to enable/disable hotkey signal emission
+        self.stored_hotkeys = {}  # Temporary storage for disabled hotkeys
         
         # Connect the signal to our own handler
         self.hotkey_triggered.connect(self.handle_hotkey)
@@ -75,7 +77,7 @@ class KeybindManager(QWidget):
         msg = ctypes.wintypes.MSG.from_address(int(message))
         if msg.message == WM_HOTKEY:
             hotkey_id = msg.wParam
-            if hotkey_id in self.hotkey_ids:
+            if hotkey_id in self.hotkey_ids and self.signals_enabled:
                 self.hotkey_triggered.emit(hotkey_id)
                 return True, 0
         return False, 0
@@ -175,11 +177,52 @@ class KeybindManager(QWidget):
         """Handle a hotkey press by calling the associated callbacks."""
         # Find the setting key for this hotkey ID
         key = next((k for k, v in self.bindings.items() if v == hk_id), None)
-        if key and key in self.callbacks:
+        if key and key in self.callbacks and self.signals_enabled:
             # Call all callbacks for this key
             for callback in self.callbacks[key]:
                 callback()
     
     def _validate_key(self, key):
         """Validate that a key is a valid keybind setting key."""
-        return key in self.KEYBIND_KEYS 
+        return key in self.KEYBIND_KEYS
+        
+    def disableSignals(self):
+        """
+        Temporarily disable hotkey processing by unregistering all hotkeys.
+        Stores the current hotkeys so they can be restored later.
+        """
+        if not self.signals_enabled:
+            return  # Already disabled
+
+        self.signals_enabled = False
+        
+        # Store current hotkeys and unregister them
+        self.stored_hotkeys = {}
+        for key, hotkey_id in self.bindings.items():
+            if hotkey_id in self.hotkey_ids:
+                vk, modifiers = self.hotkey_ids[hotkey_id]
+                self.stored_hotkeys[key] = (vk, modifiers)
+                # Unregister from Windows
+                ctypes.windll.user32.UnregisterHotKey(int(self.winId()), hotkey_id)
+        
+        # Clear current hotkey registrations but keep the mapping info
+        # so we can restore it later
+        self.bindings = {}
+        
+    def enableSignals(self):
+        """
+        Re-enable hotkey processing by re-registering all previously stored hotkeys.
+        """
+        if self.signals_enabled:
+            return  # Already enabled
+        
+        self.signals_enabled = True
+        
+        # Re-register stored hotkeys
+        for key, (vk, modifiers) in self.stored_hotkeys.items():
+            hotkey_id = self.register_hotkey(vk, modifiers)
+            if hotkey_id:
+                self.bindings[key] = hotkey_id
+                
+        # Clear the storage
+        self.stored_hotkeys = {} 
