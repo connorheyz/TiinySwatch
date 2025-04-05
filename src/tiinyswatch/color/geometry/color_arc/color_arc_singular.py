@@ -1,9 +1,7 @@
 import numpy as np
-import math
 from tiinyswatch.color.color_enhanced import QColorEnhanced
 from tiinyswatch.color.geometry.color_geometry_tools import ColorGeometryTools
 from tiinyswatch.color.geometry.color_arc.color_arc import ColorArc
-from tiinyswatch.color.geometry.color_shape import create_var
 class ColorArcSingular(ColorArc):
     
     def __init__(self, colors=None):

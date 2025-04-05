@@ -15,7 +15,7 @@ from tiinyswatch.ui.widgets.history_palette import HistoryPalette
 from tiinyswatch.ui.controls.color_controls import create_slider_classes_for_format
 from tiinyswatch.ui.controls import ComplementsControl, LinearGradientControl, PantoneControl, ColorTetraControl
 
-from tiinyswatch.ui.widgets.color_widgets import ExpandableColorBlocksWidget, ColorBlock, CircularButton, LineEdit, NotificationBanner
+from tiinyswatch.ui.widgets.color_widgets import ExpandableColorBlocksWidget, CircularButton, LineEdit, NotificationBanner
 
 class ColorPicker(QWidget):
     WINDOW_FLAGS = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool

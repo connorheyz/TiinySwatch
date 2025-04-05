@@ -3,9 +3,10 @@ from PySide6.QtGui import QAction, QActionGroup
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
 from tiinyswatch.color.color_enhanced import QColorEnhanced
+from tiinyswatch.ui.dialogs import KeybindDialog
 
 CHANGE_KEYBIND_TITLE = "Change Keybind"
-CHANGE_KEYBIND_PROMPT = "Enter the new key:"
+CHANGE_KEYBIND_PROMPT = "Press the key combination you want to use:"
 
 
 class SettingsMenu(QMenu):
@@ -140,8 +141,8 @@ class SettingsMenu(QMenu):
 
     def changeKeybind(self, settingKey):
         """Prompt user for a new key and store it under the given settingKey."""
-        key, ok = QInputDialog.getText(None, CHANGE_KEYBIND_TITLE, CHANGE_KEYBIND_PROMPT)
-        if ok and key:
+        key = KeybindDialog.getKeybind(self.parent, CHANGE_KEYBIND_TITLE, CHANGE_KEYBIND_PROMPT)
+        if key:
             Settings.set(settingKey, key)
 
     def onFormatSelected(self, formatStr):

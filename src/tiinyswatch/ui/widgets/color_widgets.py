@@ -139,7 +139,7 @@ class SliderSpinBoxPair(QWidget):
 
     def set_slider_gradient(self, set_fn, base_color=None):
         """
-        Generates and applies a QSS gradient to the slider’s groove.
+        Generates and applies a QSS gradient to the slider's groove.
         The set_fn function is used to modify a color based on a test value.
         """
         stops = []

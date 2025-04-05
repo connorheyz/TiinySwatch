@@ -29,10 +29,10 @@ def _sa_pq_transfer(y):
     Equation: f_SA-PQ(Y) = ((c1 + c2 * Y^(m)) / (1 + c3 * Y^(m)))^(n)
     """
     c1, c2, c3, m, n = _SA_PQ_CONSTS
-    numerator = c1 + c2 * np.power(y, m)
-    denominator = 1 + c3 * np.power(y, m)
+    numerator = c1 + c2 * np.sign(y) * np.power(np.abs(y), m)
+    denominator = 1 + c3 * np.sign(y) * np.power(np.abs(y), m)
     val = numerator / denominator
-    result = np.power(val, n)
+    result = np.sign(val) * np.power(np.abs(val), n)
     return result
 
 

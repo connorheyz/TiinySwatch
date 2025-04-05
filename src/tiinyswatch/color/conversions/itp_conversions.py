@@ -36,7 +36,6 @@ c1 = 0.8359375
 c2 = 18.8515625
 c3 = 18.6875
 
-@staticmethod
 def itp_to_xyz(itp_array, **kwargs):
     v = itp_array.copy()
     # Multiply the T component by 2.
@@ -55,7 +54,6 @@ def itp_to_xyz(itp_array, **kwargs):
     xyz = np.dot(lms, LMS_TO_XYZ.T)
     return xyz
 
-@staticmethod
 def xyz_to_itp(xyz_array, **kwargs):
     # Convert XYZ to LMS using the precomputed matrix.
     lms = np.dot(xyz_array.copy(), XYZ_TO_LMS_MATRIX.T)
