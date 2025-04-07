@@ -2,7 +2,6 @@ from PySide6.QtGui import QColor
 import numpy as np
 import json
 from . import conversions
-from tiinyswatch.utils.pantone_data import PantoneData
 
 COLOR_SPACES = {
     'lab': {
@@ -138,6 +137,28 @@ COLOR_SPACES = {
         'has_dirty': True,
         'white_point': np.array([1.0, 1.0, 1.0]),
         'black_point': np.array([0.0, 0.0, 0.0])
+    },
+    'cam16ucs': {
+        'keys': ['J', 'a', 'b'],
+        'ranges': [(0.0, 100.0), (-50.0, 50.0), (-50.0, 50.0)], # Based on example ranges
+        'to_xyz': conversions.cam16ucs_to_xyz,
+        'from_xyz': conversions.xyz_to_cam16ucs,
+        'default_observer': '2',
+        'default_illuminant': 'd65',
+        'has_dirty': True,
+        'white_point': np.array([100.0, 0.0, 0.0]),
+        'black_point': np.array([0.0, 0.0, 0.0])
+    },
+    'cam16lcd': {
+        'keys': ['J', 'a', 'b'],
+        'ranges': [(0.0, 100.0), (-70.0, 70.0), (-70.0, 70.0)], # Based on example ranges
+        'to_xyz': conversions.cam16lcd_to_xyz,
+        'from_xyz': conversions.xyz_to_cam16lcd,
+        'default_observer': '2',
+        'default_illuminant': 'd65',
+        'has_dirty': True,
+        'white_point': np.array([100.0, 0.0, 0.0]),
+        'black_point': np.array([0.0, 0.0, 0.0])
     }
 }
 
@@ -218,7 +239,9 @@ class QColorEnhanced:
             args['observer'] = observer
         if illuminant:
             args['illuminant'] = illuminant
-
+        #if (self._current_source == 'cam16lcd' or self._current_source == 'iab'):
+            #print(self._current_source)
+            #print(comp_array)
         xyz_arr = spec['to_xyz'](comp_array, **args)
         self._color_spaces['xyz']['components'] = xyz_arr
         self._color_spaces['xyz']['dirty'] = False
@@ -372,6 +395,7 @@ class QColorEnhanced:
         return self.find_closest_pantone(xyz_array)
 
     def set_pantone(self, name):
+        from tiinyswatch.utils.pantone_data import PantoneData
         xyz_value = PantoneData.get_xyz(name)
         print("set_pantone", name, xyz_value)
         if xyz_value:
@@ -379,6 +403,7 @@ class QColorEnhanced:
 
     @classmethod
     def _initialize_pantone_iab(cls):
+        from tiinyswatch.utils.pantone_data import PantoneData
         if cls._pantone_iab_values is None:
             # Get XYZ values from PantoneData, ensuring it's a proper 2D array
             xyz_data = PantoneData.get_xyz_values()
@@ -409,6 +434,7 @@ class QColorEnhanced:
 
     @classmethod
     def find_closest_pantone(cls, target_xyz):
+        from tiinyswatch.utils.pantone_data import PantoneData
         cls._initialize_pantone_iab()
         target_iab = conversions.xyz_to_iab(target_xyz)
         diff = cls._pantone_iab_values - target_iab

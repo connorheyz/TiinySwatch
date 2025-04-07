@@ -135,7 +135,7 @@ class ColorArc(ColorShape):
             return (A + B) / 2.0
         
         arc_axis = chord / d
-        d_ref = 0.5
+        d_ref = np.linalg.norm(QColorEnhanced.get_black_point(self.format) - self.get_format_centroid())
         effective_saturation = 1 + (saturation - 1) * (d_ref / d)
         x = effective_saturation - 1.0
         params = self.RATIONAL_PARAMS

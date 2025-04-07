@@ -15,7 +15,7 @@ from .oklab_conversions import oklab_to_xyz, xyz_to_oklab
 from .luv_conversions import luv_to_xyz, xyz_to_luv
 from .srgb_conversions import srgb_to_xyz, xyz_to_srgb
 from .iapbp_conversions import iab_to_xyz, xyz_to_iab
-
+from .cam16_conversions import xyz_to_cam16ucs, cam16ucs_to_xyz, xyz_to_cam16lcd, cam16lcd_to_xyz
 __all__ = [
     'lab_to_xyz', 'xyz_to_lab',
     'srgb_to_xyz', 'xyz_to_srgb',
@@ -29,5 +29,7 @@ __all__ = [
     'iab_to_xyz', 'xyz_to_iab',
     'adobe_to_xyz', 'xyz_to_adobe',
     'oklab_to_xyz', 'xyz_to_oklab',
-    'luv_to_xyz', 'xyz_to_luv'
+    'luv_to_xyz', 'xyz_to_luv',
+    'xyz_to_cam16ucs', 'cam16ucs_to_xyz',
+    'xyz_to_cam16lcd', 'cam16lcd_to_xyz'
 ]
