@@ -1,6 +1,6 @@
 from PySide6.QtCore import QSettings
 from typing import Dict, List, Any, Callable, Optional, Union, TypeVar, Generic, cast
-from tiinyswatch.color import QColorEnhanced
+from tiinyswatch.color.color_enhanced import QColorEnhanced
 
 T = TypeVar('T')  # Generic type variable for callback functions
 

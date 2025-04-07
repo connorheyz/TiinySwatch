@@ -21,7 +21,7 @@ class ColorTetra(ColorShape):
         color = colors[0]
         A = self.color_to_point(color)
         
-        saturation = self.get_value("saturation")
+        saturation = self.get_value("saturation") * self.get_distance_from_black_to_white()/2.0
         hue = self.get_value("hue")
         n_points = self.get_value("n")
         

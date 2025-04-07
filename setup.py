@@ -25,7 +25,7 @@ setup(name="TiinySwatch",
       executables=[Executable(
           "src/app.py",
           shortcut_name="Tiiny Swatch",
-          shortcut_dir="DesktopFolder",
+          shortcut_dir=["DesktopFolder", "StartMenuFolder"],
           base="Win32GUI",
           icon="assets/icons/TiinySwatch.ico"
       )

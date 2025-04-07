@@ -36,6 +36,8 @@ class ColorPicker(QWidget):
         "Ia'b'": create_slider_classes_for_format('iab'),
         "Adobe RGB": create_slider_classes_for_format('adobe_rgb'),
         "OKLab": create_slider_classes_for_format('oklab'),
+        "CAM16 LCD": create_slider_classes_for_format('cam16lcd'),
+        "CAM16 UCS": create_slider_classes_for_format('cam16ucs'),
         "Complements": [ComplementsControl],
         "Linear Gradient": [LinearGradientControl],
         "Pantone Match": [PantoneControl],
@@ -44,7 +46,7 @@ class ColorPicker(QWidget):
 
     # New grouping of formats into categories.
     FORMAT_CATEGORIES = {
-        "Spaces": ["sRGB", "HSV", "HSL", "CMYK", "XYZ", "Lab", "xyY", "IPT", "ICtCp", "ITP", "Ia'b'", "OKLab"],
+        "Spaces": ["sRGB", "HSV", "HSL", "CMYK", "XYZ", "Lab", "xyY", "IPT", "ICtCp", "ITP", "Ia'b'", "OKLab", "CAM16 LCD", "CAM16 UCS"],
         "Tools": ["Complements", "Linear Gradient", "Pantone Match", "Color Tetra"]
     }
 

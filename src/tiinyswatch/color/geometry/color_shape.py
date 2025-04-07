@@ -70,7 +70,7 @@ class ColorShapeMeta(type):
 
 class ColorShape(metaclass=ColorShapeMeta):
     def __init__(self, colors=None):
-        self._format = "iab"
+        self._format = "cam16lcd"
         self._shape = np.array([])
         self._color_seed = None
         self.init_variables()
@@ -132,7 +132,7 @@ class ColorShape(metaclass=ColorShapeMeta):
         point = variable.preview_value(self, value)
         for var in self.get_apply_variables():
             if var.name != variable_name:
-                point = var.apply_value(self, [point])
+                point = var.apply_value(self, [point])[0]
         self.set_color_from_point(base_color, point)
 
     def get_value(self, variable_name):
@@ -154,6 +154,10 @@ class ColorShape(metaclass=ColorShapeMeta):
 
     def get_format_centroid(self):
         return QColorEnhanced.get_centroid(self.format)
+    
+    def get_distance_from_black_to_white(self):
+        distance = np.linalg.norm(QColorEnhanced.get_white_point(self.format) - QColorEnhanced.get_black_point(self.format))
+        return distance
 
     # Subclasses must implement this
     def compute_from_seed(self, colors):
