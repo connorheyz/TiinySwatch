@@ -22,7 +22,7 @@ class ColorArc(ColorShape):
                       preview=lambda inst, val: inst.preview_hue_value(val),
                       apply=lambda inst, pts, val: inst.apply_hue_value(pts, val),
                       disp_name="Hue.", default=0.0, range=(0.0, np.pi * 2.0))
-    n = create_var("n", int, disp_name="Points:", default=5, range=(1, 12))
+    n = create_var("n", int, disp_name="Colors:", default=5, range=(1, 12))
     
     def __init__(self, colors=None):
         # Expecting two seed colors (for the arc endpoints)

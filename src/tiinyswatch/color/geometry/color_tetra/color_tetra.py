@@ -12,7 +12,7 @@ class ColorTetra(ColorShape):
     """
     
     # Register variable for number of points.
-    n = create_var("n", int, disp_name="Points:", default=4, range=(4, 10))
+    n = create_var("n", int, disp_name="Colors:", default=4, range=(4, 10))
     saturation = create_var("saturation", float, disp_name="Sat.", default=1.0, range=(0.0, 2.0))
     hue = create_var("hue", float, disp_name="Hue.", default=0.0, range=(0.0, np.pi * 2.0))
     

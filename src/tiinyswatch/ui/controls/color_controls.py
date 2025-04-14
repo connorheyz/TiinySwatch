@@ -1,13 +1,5 @@
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QSpinBox, QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLayout, QSizePolicy
-from tiinyswatch.ui.widgets.color_widgets import ClickableLineEdit, ColorBlock, ExpandableColorBlocksWidget, SliderSpinBoxPair, LineEdit
-from tiinyswatch.utils.clipboard_manager import ClipboardManager
+from PySide6.QtWidgets import QWidget
 from tiinyswatch.color import QColorEnhanced
-from tiinyswatch.color.geometry import ColorArc, ColorArcSingular, ColorTetra, TwoColorTetra
-from tiinyswatch.utils.pantone_data import PantoneData  # Assumed to exist
-from tiinyswatch.color.formatting import GradientFormatters
-import math
-from functools import partial
 # --- Base Color Control ---
 
 class ColorControl:

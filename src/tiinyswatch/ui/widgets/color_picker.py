@@ -41,13 +41,13 @@ class ColorPicker(QWidget):
         "Complements": [ComplementsControl],
         "Linear Gradient": [LinearGradientControl],
         "Pantone Match": [PantoneControl],
-        "Color Tetra": [ColorTetraControl]
+        "Distinct Colors": [ColorTetraControl]
     }
 
     # New grouping of formats into categories.
     FORMAT_CATEGORIES = {
         "Spaces": ["sRGB", "HSV", "HSL", "CMYK", "XYZ", "Lab", "xyY", "IPT", "ICtCp", "ITP", "Ia'b'", "OKLab", "CAM16 LCD", "CAM16 UCS"],
-        "Tools": ["Complements", "Linear Gradient", "Pantone Match", "Color Tetra"]
+        "Tools": ["Complements", "Linear Gradient", "Pantone Match", "Distinct Colors"]
     }
 
     def __init__(self, parent=None):

@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLa
 from tiinyswatch.ui.widgets.color_widgets import ClickableLineEdit, ExpandableColorBlocksWidget, SliderSpinBoxPair, LabeledSpinbox
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
 from tiinyswatch.color import QColorEnhanced
-from tiinyswatch.color.geometry import ColorArc, ColorArcSingular, ColorTetra, TwoColorTetra
+from tiinyswatch.color.geometry import ColorArc, ColorArcSingular, ColorTetra
 from tiinyswatch.color.formatting import GradientFormatters
 from tiinyswatch.ui.controls.color_controls import ColorControl
 from functools import partial
