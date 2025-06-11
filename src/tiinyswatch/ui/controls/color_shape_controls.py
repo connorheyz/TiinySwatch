@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QLabel, QHBoxLayout, QPushButton, QVBoxLayout, QSizePolicy
-from tiinyswatch.ui.widgets.color_widgets import ClickableLineEdit, ExpandableColorBlocksWidget, SliderSpinBoxPair, LabeledSpinbox
+from tiinyswatch.ui.widgets.color_widgets import ClickableLineEdit, ExpandableColorBlocksWidget, ValueControlWidget
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
 from tiinyswatch.color import QColorEnhanced
 from tiinyswatch.color.geometry import ColorArc, ColorArcSingular, ColorTetra
@@ -80,45 +80,45 @@ class ColorShapeControl(ColorControl):
         return self.widgets
 
     def _create_variable_controls(self):
-        # Iterate in registration order over the ColorShape subclass’s variables.
         for var in self.shape_class._registered_variables:
-            # Assume each variable has a get_effective_range() method.
-            effective_range = var.get_effective_range() if hasattr(var, "get_effective_range") else (0.0, 1.0)
-            if var.var_type == float:
-                control = SliderSpinBoxPair(
-                    ui_range=effective_range,
-                    actual_range=effective_range,
-                    decimals=3,
-                    label_text=var.disp_name,
-                    parent=self.container
-                )
-                control.steps = 5
-                control.setLabelWidth(25)
-                if self._shape_instance._variables[var.name].value is not None:
-                    control.set_value(self._shape_instance.get_value(var.name))
-                else:
-                    control.set_value(var.value)
-                control.valueChanged.connect(lambda value, name=var.name: self.on_variable_changed(name, value))
-            elif var.var_type == int:
-                control = LabeledSpinbox(label_text=var.disp_name,parent=self.container)
-                control.setLabelWidth(75)
-                if self._shape_instance._variables[var.name].value is not None:
-                    control.set_value(self._shape_instance.get_value(var.name))
-                else:
-                    control.set_value(var.value)
-                control.set_range(effective_range[0], effective_range[1])
-                control.valueChanged.connect(lambda value, name=var.name: self.on_variable_changed(name, value))
-            else:
-                control = None
+            # Assume each variable has a get_effective_range() method for its primary value.
+            value_range = var.get_effective_range() if hasattr(var, "get_effective_range") else (0.0, 1.0)
 
-            if control is not None:
-                self.var_controls[var.name] = control
-                self.main_layout.addWidget(control)
+            # Determine decimals based on var_type
+            decimals = 3 if var.var_type == float else None
+
+            control = ValueControlWidget(
+                range=value_range,        # Set the primary value range
+                # ui_range defaults to range, which is usually desired here
+                decimals=decimals,        # Determines int/float mode
+                label_text=var.disp_name,
+                show_slider=(var.var_type == float), # Only show slider for float variables
+                show_spinbox=True,        # Always show spinbox
+                parent=self.container
+            )
+
+            if var.var_type == float:
+                control.steps = 5 # Keep the steps if needed for gradient calculation
+                control.setLabelWidth(25)
+            else: # int
+                control.setLabelWidth(75)
+                # For int types, explicitly set the UI range if it differs? Usually not.
+                # If ui_range needs setting, it would be done here:
+                # control.set_range(min_val, max_val)
+
+            current_val = self._shape_instance.get_value(var.name)
+            control.set_value(current_val if current_val is not None else var.value)
+
+            # Connect directly to the single valueChanged signal
+            control.valueChanged.connect(lambda value, name=var.name: self.on_variable_changed(name, value))
+
+            self.var_controls[var.name] = control
+            self.main_layout.addWidget(control)
 
     def on_variable_changed(self, var_name, value):
         """
         Called when any control is changed.
-          - Updates the shape instance’s variable.
+          - Updates the shape instance's variable.
           - If the variable is non-apply (i.e. a full recompute is needed) and seed colors exist,
             then recompute the shape.
           - Always updates the preview.
@@ -132,14 +132,14 @@ class ColorShapeControl(ColorControl):
     def update_slider_gradients(self, except_var_name=None):
         for var_name, control in self.var_controls.items():
             if var_name != except_var_name and self._shape_instance._variables[var_name].preview_func is not None:
-                if isinstance(control, SliderSpinBoxPair):
+                if control.slider:
                     prev_fn = partial(self._shape_instance.preview_variable, var_name)
                     control.set_slider_gradient(prev_fn)
 
     def update_slider_handles(self, color):
         for var_name, control in self.var_controls.items():
             if self._shape_instance._variables[var_name].preview_func is None:
-                if isinstance(control, SliderSpinBoxPair):
+                if control.slider:
                     control.set_handle_color(color)
 
     def update_color_preview(self):

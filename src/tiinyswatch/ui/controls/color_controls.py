@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QWidget
 from tiinyswatch.color import QColorEnhanced
+from tiinyswatch.ui.widgets.color_widgets import ValueControlWidget
 # --- Base Color Control ---
 
 class ColorControl:
@@ -32,46 +33,55 @@ class ColorControl:
 
 class PairControl(ColorControl):
     """
-    A default control that uses a SliderSpinBoxPair.
+    A default control that uses a ValueControlWidget.
     """
-    def __init__(self, name, actual_range, ui_range, steps=10, decimals=None):
+    def __init__(self, name, range, ui_range=None, steps=10, decimals=None):
+        # Pass decimals directly to ColorControl base
         super().__init__(name, decimals)
-        self.actual_range = actual_range
-        self.ui_range = ui_range
+        self.range = range
+        self.ui_range = ui_range # Can be None
         self.steps = steps
 
     def create_widgets(self, parent: QWidget):
-        self.slider_pair = SliderSpinBoxPair(
-            actual_range=self.actual_range,
-            ui_range=self.ui_range,
+        # No need to determine value_type here, ValueControlWidget does it based on decimals
+        self.value_control = ValueControlWidget(
+            range=self.range, # Pass the primary range
+            ui_range=self.ui_range, # Pass the optional UI range
             steps=self.steps,
             decimals=self.decimals,
+            show_label=False, # PairControl historically didn't have a label
             parent=parent
         )
-        self.widgets = [self.slider_pair]
+        self.widgets = [self.value_control]
         return self.widgets
 
     def update_widgets(self, color):
         actual = self.get_value(color)
-        self.slider_pair.set_value(actual)
-        self.slider_pair.set_slider_gradient(self.set_value, color)
+        self.value_control.set_value(actual)
+        if self.value_control.slider:
+            self.value_control.set_slider_gradient(self.set_value, color)
 
     def connect_signals(self, on_value_changed):
-        self.slider_pair.valueChanged.connect(on_value_changed)
+        # Connect directly to the single valueChanged signal
+        self.value_control.valueChanged.connect(on_value_changed)
 
 def create_slider_class(fmt: str, comp: str, ui_range: tuple, actual_range: tuple, steps: int = 10):
     """
     Dynamically creates a PairControl subclass for the given color format and component.
+    NOTE: Renaming actual_range parameter to value_range for clarity
     """
-    decimals = None if isinstance(ui_range[0], int) and isinstance(ui_range[1], int) else 3
+    value_range = actual_range # Rename for clarity matching ValueControlWidget
+    # Determine decimals based on the VALUE range, not the UI range
+    decimals = 3 if isinstance(value_range[0], float) or isinstance(value_range[1], float) else None
     class_name = f"{fmt.upper()}{comp.capitalize()}Control"
 
     def __init__(self, steps_override=steps):
+        # Pass value_range as `range`, ui_range as `ui_range`
         PairControl.__init__(
             self,
             name=class_name,
-            actual_range=actual_range,
-            ui_range=ui_range,
+            range=value_range,
+            ui_range=ui_range, # Pass the specific UI range for display
             steps=steps_override,
             decimals=decimals,
         )

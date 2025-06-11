@@ -16,7 +16,10 @@ from tiinyswatch.ui.controls.color_controls import create_slider_classes_for_for
 from tiinyswatch.ui.controls import ComplementsControl, LinearGradientControl, PantoneControl, ColorTetraControl
 
 from tiinyswatch.ui.widgets.color_widgets import ExpandableColorBlocksWidget, CircularButton, LineEdit, NotificationBanner
+# Import the new widget
+from tiinyswatch.ui.widgets.format_section_widget import FormatSectionWidget
 
+# --- Main Color Picker Class ---
 class ColorPicker(QWidget):
     WINDOW_FLAGS = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     SAVE_SHORTCUT = "Ctrl+S"
@@ -67,6 +70,8 @@ class ColorPicker(QWidget):
         # Remove now-unneeded previewSegments & animation properties.
         # The preview will be handled by ExpandableColorBlocksWidget.
         self.initWindow()
+        # Initialize format_section_widgets before initUI calls rebuildFormatSections
+        self.format_section_widgets = []
         self.initUI()
         self.initConnections()
         self.updateUI()
@@ -138,39 +143,29 @@ class ColorPicker(QWidget):
         return header
 
     def rebuildFormatSections(self):
+        # Clear previous section widgets first
         self.clearLayout(self.formatContainer)
-        self.controls.clear()
+        self.format_section_widgets.clear() # Clear the list of widgets
 
         for index, fmt in enumerate(self.format_sections):
-            sectionLayout = QVBoxLayout()
-            sectionHeader = QHBoxLayout()
-            sectionHeader.setContentsMargins(0, 0, 0, 0)
-            fmtButton = QPushButton(fmt, objectName="FormatLabel")
-            fmtButton.setText(fmt)
-            fmtButton.clicked.connect(partial(self.showFormatPopup, index))
-            fmtButton.setFixedSize(120, 20)
-            sectionHeader.addWidget(fmtButton)
-            sectionHeader.addStretch()
-            minusButton = CircularButton("-", self)
-            minusButton.clicked.connect(partial(self.removeFormat, index))
-            sectionHeader.addWidget(minusButton)
-            sectionLayout.addLayout(sectionHeader)
-
-            divider = QFrame()
-            divider.setFrameShape(QFrame.HLine)
-            divider.setFrameShadow(QFrame.Sunken)
-            sectionLayout.addWidget(divider)
-
             channelList = ColorPicker.FORMAT_CHANNELS.get(fmt, [])
-            controls = self.buildControlsForSection(index, channelList)
-            for ctrl in controls:
-                row = QHBoxLayout()
-                for widget in ctrl.widgets:
-                    row.addWidget(widget)
-                sectionLayout.addLayout(row)
 
-            self.formatContainer.addLayout(sectionLayout)
+            # Create the new section widget, passing necessary callbacks
+            section_widget = FormatSectionWidget(
+                format_name=fmt,
+                channel_list=channelList,
+                section_index=index,
+                show_format_popup_cb=self.showFormatPopup,
+                remove_format_cb=self.removeFormat,
+                value_changed_cb=self.onControlValueChanged,
+                parent=self # Parent to the ColorPicker's content area maybe?
+                           # Let's parent to the widget containing formatContainer
+                           # Assuming self.formatContainer is a layout in contentWidget
+            )
+            self.formatContainer.addWidget(section_widget)
+            self.format_section_widgets.append(section_widget)
 
+        # Add the '+' button if needed
         if len(self.format_sections) < 4:
             plusLayout = QHBoxLayout()
             plusLayout.addStretch()
@@ -193,16 +188,6 @@ class ColorPicker(QWidget):
                 self.clearLayout(item.layout())
                 item.layout().deleteLater()
 
-    def buildControlsForSection(self, section_index, channel_list):
-        controls = []
-        for channel in channel_list:
-            control = channel()
-            control.create_widgets(self)
-            control.connect_signals(lambda val, s=section_index, ch=channel, ctrl=control: self.onControlValueChanged(s, ch, val, ctrl))
-            self.controls[(section_index, channel)] = control
-            controls.append(control)
-        return controls
-    
     def initConnections(self):
         self.saveShortcut = QShortcut(QKeySequence(ColorPicker.SAVE_SHORTCUT), self)
         self.saveShortcut.activated.connect(self.onSave)
@@ -255,8 +240,9 @@ class ColorPicker(QWidget):
             Settings.set("currentColors", current_colors)
         else:
             Settings.set("currentColors", actual_value)
-        self.updateColorPreview()
-        self.updateUI()
+        # No need to update color preview here, Settings listener will trigger updateUI
+        # self.updateColorPreview()
+        # self.updateUI() # This will be triggered by Settings change
 
     def receiveNotification(self, message, notif_type):
         self.notificationBanner.showNotification(message, notif_type)
@@ -272,12 +258,17 @@ class ColorPicker(QWidget):
         currentColorIndex = Settings.get("selectedIndex")
         selected_color = current_colors[currentColorIndex]
         self.hexEdit.setTextWithFocus(selected_color.name())
-        for control in self.controls.values():
-            if control.use_single:
-                control.update_widgets(selected_color)
-            else:
-                control.update_widgets(current_colors)
-        self.updateColorPreview()
+
+        # Update via the section widgets
+        # Determine what to pass: single selected color or the full list
+        # This depends on what the controls within the section expect.
+        # The section widget's update method now handles this logic.
+        for section_widget in self.format_section_widgets:
+            # Pass the full state (colors list and selected index)
+            # The section widget will decide how to use it.
+            section_widget.update_section_widgets(current_colors, currentColorIndex)
+
+        self.updateColorPreview() # Keep this to update the top preview
 
     def updateColorPreview(self, *args):
         current_colors = Settings.get("currentColors") or []

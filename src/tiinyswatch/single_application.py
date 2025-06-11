@@ -1,6 +1,6 @@
-from PySide6.QtCore import *
+from PySide6.QtCore import QTextStream, Qt, Signal
 from PySide6.QtGui import *
-from PySide6.QtNetwork import *
+from PySide6.QtNetwork import QLocalSocket, QLocalServer
 from PySide6.QtWidgets import QApplication
 
 class QtSingleApplication(QApplication):

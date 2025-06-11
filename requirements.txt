@@ -1,5 +1,4 @@
-git+https://github.com/gtaylor/python-colormath.git@master
-numpy==1.23.0
+colormath
+numpy<2
 PySide6==6.6.1
-cx-Freeze==7.2.10
 pillow==10.1.0

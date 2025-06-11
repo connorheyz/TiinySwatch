@@ -1,4 +1,3 @@
-
 from PySide6.QtWidgets import QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QWidget, QLabel, QHBoxLayout, QPushButton, QGraphicsOpacityEffect
 from PySide6.QtGui import QFont, QFontMetrics
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
@@ -33,123 +32,316 @@ class ClickableLineEdit(QLineEdit):
         self.setStyleSheet(self.hover_style)
         super().mousePressEvent(event)
 
-class SliderSpinBoxPair(QWidget):
+class ValueControlWidget(QWidget):
     """
-    A composite widget that contains an optional label, a slider, and a spinbox.
-    The spinbox has a fixed width and the slider expands.
-    It emits valueChanged(actual_value) whenever the value changes.
+    A flexible composite widget that can contain an optional label, slider, and spinbox.
+    It handles both integer and float values and supports optional mapping between
+    a primary 'value' range and a separate 'UI' range for the widgets.
+
+    The widget operates in 'integer' mode if `decimals` is None, and 'float' mode otherwise.
+    It emits the actual value through the `intValueChanged` or `floatValueChanged` signals.
+    Use `connect_value_changed(slot)` for easy connection.
     """
-    valueChanged = Signal(float)
-    
+    # Define separate signals for int and float - Replaced with single object signal
+    # intValueChanged = Signal(int)
+    # floatValueChanged = Signal(float)
+    valueChanged = Signal(object) # Emit int or float based on mode
+
     def __init__(
-        self, 
-        actual_range, 
-        ui_range, 
-        steps=5, 
-        decimals=None, 
-        spinbox_width=60, 
-        label_text=None, 
+        self,
+        range=(0.0, 1.0),         # Primary value range (min, max)
+        ui_range=None,            # Optional: UI widget range (min, max). Defaults to `range`.
+        decimals=2,               # Decimals for float type. None implies integer mode.
+        steps=5,                  # Steps for gradient calculation
+        show_label=True,
+        show_slider=True,
+        show_spinbox=True,
+        label_text="",
+        spinbox_width=60,
         parent=None
     ):
         super().__init__(parent)
-        self.actual_range = actual_range  # (min, max) in “actual” values
-        self.ui_range = ui_range          # (min, max) for the widgets
+
+        # Determine mode from decimals
+        self._is_float_mode = decimals is not None
+        self.decimals = decimals if self._is_float_mode else 0 # Store 0 for int mode consistency
+
+        # Set ranges
+        self.range = range
+        self.ui_range = ui_range if ui_range is not None else range # Default ui_range to range
+
+        # Validate ranges (basic check)
+        if not (isinstance(self.range, tuple) and len(self.range) == 2):
+            raise ValueError("'range' must be a tuple of (min, max).")
+        if not (isinstance(self.ui_range, tuple) and len(self.ui_range) == 2):
+             raise ValueError("'ui_range' must be a tuple of (min, max).")
+
+        # Further parameter storage
         self.steps = steps
-        self.decimals = decimals
+        self.show_label = show_label
+        self.show_slider = show_slider
+        self.show_spinbox = show_spinbox
         self.label_text = label_text
-        self.base_style = ""
+        self.spinbox_width = spinbox_width
+
+        # Widget references
+        self.label = None
+        self.slider = None
+        self.spinbox = None
         self._base_color = QColorEnhanced()
-        self._init_ui(spinbox_width)
-    
-    def _init_ui(self, spinbox_width):
+
+        self._init_ui()
+
+    # --- UI Initialization Helpers ---
+    def _init_ui(self):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        
-        # If a label is provided, create and add it.
-        if self.label_text:
+
+        self._create_label(layout)
+        self._create_slider(layout)
+        self._create_spinbox(layout)
+        self._connect_widgets()
+
+        # Add stretch if necessary (e.g., label only, or label + spinbox without slider)
+        if not self.slider:
+            if not self.spinbox or self.label:
+                layout.insertStretch(layout.indexOf(self.spinbox) if self.spinbox else 1, 1)
+
+    def _create_label(self, layout):
+        if self.show_label:
             self.label = QLabel(self.label_text, self)
             layout.addWidget(self.label)
-        else:
-            self.label = None
-        
+
+    def _create_slider(self, layout):
+        if not self.show_slider: return
+
         ui_min, ui_max = self.ui_range
-        
-        # Create either a double or integer slider/spinbox based on `decimals`
-        if self.decimals is not None:
+        if self._is_float_mode:
             self.slider = QDoubleSlider(self.decimals, Qt.Horizontal, self)
-            self.spinbox = QDoubleSpinBox(self)
-            self.spinbox.setSingleStep(10 ** (-self.decimals))
-            self.spinbox.setDecimals(self.decimals)
-        else:
+        else: # Integer mode
             self.slider = QSlider(Qt.Horizontal, self)
-            self.spinbox = QSpinBox(self)
-        
+
         self.slider.setMinimum(ui_min)
         self.slider.setMaximum(ui_max)
-        self.spinbox.setRange(ui_min, ui_max)
-        self.spinbox.setFixedWidth(spinbox_width)
-        
-        layout.addWidget(self.slider, 1)
-        layout.addWidget(self.spinbox, 0)
-        
-        if self.decimals is not None:
-            self.slider.doubleValueChanged.connect(self.spinbox.setValue)
-            self.spinbox.valueChanged.connect(self.slider.setValue)
-        else:
-            self.slider.valueChanged.connect(self.spinbox.setValue)
-            self.spinbox.valueChanged.connect(self.slider.setValue)
-        
-        self.spinbox.valueChanged.connect(self._emit_value)
-    
-    def _emit_value(self, val):
-        actual = self.ui_to_actual(val)
-        self.valueChanged.emit(actual)
-    
-    def actual_to_ui(self, actual_value):
-        a_min, a_max = self.actual_range
+        layout.addWidget(self.slider, 1) # Slider takes stretch factor 1
+
+    def _create_spinbox(self, layout):
+        if not self.show_spinbox: return
+
         ui_min, ui_max = self.ui_range
+        if self._is_float_mode:
+            self.spinbox = QDoubleSpinBox(self)
+            self.spinbox.setSingleStep(10 ** (-self.decimals))
+            # Conditionally set display decimals based on ui_range type
+            if isinstance(ui_min, int) and isinstance(ui_max, int):
+                self.spinbox.setDecimals(0)
+            else:
+                self.spinbox.setDecimals(self.decimals)
+        else: # Integer mode
+            self.spinbox = QSpinBox(self)
+
+        self.spinbox.setRange(ui_min, ui_max)
+        self.spinbox.setFixedWidth(self.spinbox_width)
+        layout.addWidget(self.spinbox, 0) # Spinbox takes stretch factor 0
+
+    def _connect_widgets(self):
+        # Disconnect helper using try-except
+        def _try_disconnect(widget, signal_name, slot):
+            if widget is None: return
+            try:
+                signal = getattr(widget, signal_name)
+                signal.disconnect(slot)
+            except (AttributeError, RuntimeError, TypeError): # TypeError if signal doesn't exist
+                pass # Ignore if disconnect fails (already disconnected or wrong widget type)
+
+        # Connect slider and spinbox to each other if both exist
+        if self.slider and self.spinbox:
+            # Reintroduce mode checking for type compatibility, even with unified signal name
+            if self._is_float_mode:
+                # Connect float signals/slots
+                _try_disconnect(self.slider, 'doubleValueChanged', self._handle_slider_change)
+                _try_disconnect(self.spinbox, 'valueChanged', self._handle_spinbox_change)
+                self.slider.doubleValueChanged.connect(self.spinbox.setValue) # QDoubleSlider(float) -> QDoubleSpinBox.setValue(float)
+                self.spinbox.valueChanged.connect(self.slider.setValue) # QDoubleSpinBox(float) -> QDoubleSlider.setValue(float)
+                self.spinbox.valueChanged.connect(self._emit_value) # Emit from spinbox change (float)
+            else: # Integer mode
+                # Connect int signals/slots
+                _try_disconnect(self.slider, 'valueChanged', self._handle_slider_change)
+                _try_disconnect(self.spinbox, 'valueChanged', self._handle_spinbox_change)
+                self.slider.valueChanged.connect(self.spinbox.setValue) # QSlider(int) -> QSpinBox.setValue(int)
+                self.spinbox.valueChanged.connect(self.slider.setValue) # QSpinBox(int) -> QSlider.setValue(int)
+                self.spinbox.valueChanged.connect(self._emit_value) # Emit from spinbox change (int)
+
+        # Connect single widget emit if only one exists
+        elif self.slider:
+            # Slider (int or float) emits valueChanged -> _emit_value
+            _try_disconnect(self.slider, 'valueChanged', self._handle_slider_change)
+            self.slider.valueChanged.connect(self._emit_value)
+        elif self.spinbox:
+            # Spinbox (int or float) emits valueChanged -> _emit_value
+            _try_disconnect(self.spinbox, 'valueChanged', self._handle_spinbox_change)
+            self.spinbox.valueChanged.connect(self._emit_value)
+
+    # --- Signal Handling & Emission ---
+    # Removed connect_value_changed helper method
+    # def connect_value_changed(self, slot):
+    #     """Connects the given slot to the appropriate int or float signal."""
+    #     if self._is_float_mode:
+    #         self.floatValueChanged.connect(slot)
+    #     else:
+    #         self.intValueChanged.connect(slot)
+
+    def _handle_slider_change(self, ui_val):
+        # This only triggers if slider exists but spinbox doesn't
+        if not self.spinbox:
+            self._emit_value(ui_val)
+
+    def _handle_spinbox_change(self, ui_val):
+         # This only triggers if spinbox exists but slider doesn't
+        if not self.slider:
+            self._emit_value(ui_val)
+
+    def _emit_value(self, ui_val):
+        actual = self.ui_to_actual(ui_val)
+        # Emit the appropriate signal based on mode
+        if self._is_float_mode:
+             self.valueChanged.emit(float(actual)) # Emit float
+        else:
+             self.valueChanged.emit(int(round(actual))) # Emit int
+
+    # --- Value Mapping ---
+    def actual_to_ui(self, actual_value):
+        # Renamed actual_range to range
+        if self.range == self.ui_range:
+            return actual_value
+
+        a_min, a_max = self.range
+        ui_min, ui_max = self.ui_range
+
+        if a_max == a_min: return ui_min
+        if ui_max == ui_min: return ui_min
+
         proportion = (actual_value - a_min) / (a_max - a_min)
         ui_value = proportion * (ui_max - ui_min) + ui_min
-        return int(round(ui_value)) if self.decimals is None else ui_value
+        ui_value = max(ui_min, min(ui_value, ui_max)) # Clamp
+
+        # Return type depends on slider/spinbox used, which depends on _is_float_mode
+        # However, the UI elements (QSlider/QSpinBox or QDouble...) expect their native types.
+        # QDoubleSlider/QDoubleSpinBox expect float for setValue.
+        # QSlider/QSpinBox expect int for setValue.
+        # Let's return the type expected by the UI elements we created.
+        return ui_value if self._is_float_mode else int(round(ui_value))
 
     def ui_to_actual(self, ui_value):
-        a_min, a_max = self.actual_range
+        # Renamed actual_range to range
+        if self.range == self.ui_range:
+            return ui_value
+
+        a_min, a_max = self.range
         ui_min, ui_max = self.ui_range
-        proportion = (ui_value - ui_min) / (ui_max - ui_min)
-        return proportion * (a_max - a_min) + a_min
 
+        if ui_max == ui_min: return a_min
+        if a_max == a_min: return a_min
+
+        # Ensure ui_value is float for calculation if underlying widgets are float-based
+        # even if spinbox display decimals is 0
+        # Also handle potential type mismatch if only one widget exists
+        if self.slider and not self.spinbox:
+            calc_ui_value = float(ui_value) if isinstance(self.slider, QDoubleSlider) else ui_value
+        elif self.spinbox and not self.slider:
+            calc_ui_value = float(ui_value) if isinstance(self.spinbox, QDoubleSpinBox) else ui_value
+        elif self.slider and self.spinbox: # Both exist, mode dictates calculation type
+             calc_ui_value = float(ui_value) if self._is_float_mode else ui_value
+        else: # No widgets, should not happen
+            return a_min
+
+        proportion = (calc_ui_value - ui_min) / (ui_max - ui_min)
+        actual_value = proportion * (a_max - a_min) + a_min
+        actual_value = max(a_min, min(actual_value, a_max)) # Clamp
+
+        return actual_value
+
+    # --- Getters and Setters ---
     def set_value(self, actual_value):
+        """Sets the widget's value using an 'actual' (primary range) value."""
         ui_val = self.actual_to_ui(actual_value)
-        self.slider.blockSignals(True)
-        self.spinbox.blockSignals(True)
-        self.slider.setValue(ui_val)
-        self.spinbox.setValue(ui_val)
-        self.slider.blockSignals(False)
-        self.spinbox.blockSignals(False)
 
+        # Block signals during programmatic update
+        slider_blocked = False
+        spinbox_blocked = False
+        if self.slider: slider_blocked = self.slider.blockSignals(True)
+        if self.spinbox: spinbox_blocked = self.spinbox.blockSignals(True)
+
+        try:
+            self._update_slider_ui(ui_val)
+            self._update_spinbox_ui(ui_val)
+        finally:
+            # Unblock signals respecting their previous state
+            if self.slider: self.slider.blockSignals(slider_blocked)
+            if self.spinbox: self.spinbox.blockSignals(spinbox_blocked)
+
+    def _update_slider_ui(self, ui_val):
+        """Helper to update the slider's UI value."""
+        if self.slider:
+            # QDoubleSlider needs float, QSlider needs int
+            self.slider.setValue(ui_val if self._is_float_mode else int(round(ui_val)))
+
+    def _update_spinbox_ui(self, ui_val):
+        """Helper to update the spinbox's UI value."""
+        if self.spinbox:
+            # QDoubleSpinBox needs float, QSpinBox needs int
+            self.spinbox.setValue(float(ui_val) if self._is_float_mode else int(round(ui_val)))
+
+    def get_value(self):
+        """Gets the current 'actual' (primary range) value from the widget."""
+        if self.spinbox:
+            ui_val = self.spinbox.value() # This returns float for QDoubleSpinBox, int for QSpinBox
+        elif self.slider:
+            ui_val = self.slider.value() # This returns float for QDoubleSlider, int for QSlider
+        else:
+            return self.range[0] # Default to min of primary range
+        return self.ui_to_actual(ui_val)
+
+    # --- Styling --- (No changes needed here for API refactor)
     def set_handle_color(self, base_color):
+        if not self.slider: return
         style = f"""
         QSlider::handle:horizontal {{
             background: {base_color.name()};
             width: 0.8em;
         }}
         """
-        self.base_style = style
         self.slider.setStyleSheet(style)
 
     def set_slider_gradient(self, set_fn, base_color=None):
         """
         Generates and applies a QSS gradient to the slider's groove.
-        The set_fn function is used to modify a color based on a test value.
+        The set_fn function(color, test_value) modifies a color based on a value.
+        Uses the primary `range` for calculations.
         """
+        if not self.slider: return
+
         stops = []
         if base_color is not None:
             self._base_color.copy_values(base_color)
-        for i in range(self.steps + 1):
-            fraction = i / float(self.steps)
-            test_val = self.actual_range[0] + fraction * (self.actual_range[1] - self.actual_range[0])
-            set_fn(self._base_color, test_val)
-            stops.append((fraction, self._base_color.name()))
+
+        # Use self.range (renamed from actual_range)
+        a_min, a_max = self.range
+        if a_max - a_min == 0:
+             # Use a temporary color for modification by set_fn
+             temp_color = QColorEnhanced()
+             temp_color.copy_values(self._base_color)
+             set_fn(temp_color, a_min)
+             stops = [(0.0, temp_color.name()), (1.0, temp_color.name())]
+        else:
+            for i in range(self.steps + 1):
+                fraction = i / float(self.steps)
+                test_val = a_min + fraction * (a_max - a_min)
+                temp_color = QColorEnhanced()
+                temp_color.copy_values(self._base_color)
+                set_fn(temp_color, test_val)
+                stops.append((fraction, temp_color.name()))
+
         stops_str = ", ".join(f"stop:{frac:.2f} {col}" for (frac, col) in stops)
         gradient_css = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, {stops_str})"
         style = f"""
@@ -157,72 +349,29 @@ class SliderSpinBoxPair(QWidget):
                 background: {gradient_css};
             }}
         """
-        self.base_style = style
         self.slider.setStyleSheet(style)
-        
+
+    # --- Configuration --- (No changes needed here for API refactor)
     def setLabelWidth(self, width):
         """Sets the label width if the label exists."""
         if self.label:
             self.label.setFixedWidth(width)
 
-class LabeledSpinbox(QWidget):
-    """
-    A composite widget that contains an optional label, a slider, and a spinbox.
-    The spinbox has a fixed width and the slider expands.
-    It emits valueChanged(actual_value) whenever the value changes.
-    """
-    valueChanged = Signal(int)
-    
-    def __init__(
-        self,  
-        spinbox_width=60, 
-        label_text=None, 
-        parent=None
-    ):
-        super().__init__(parent)
-        self.label_text = label_text
-        self.base_style = ""
-        self._base_color = QColorEnhanced()
-        self._init_ui(spinbox_width)
-    
-    def _init_ui(self, spinbox_width):
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        # If a label is provided, create and add it.
-        if self.label_text:
-            self.label = QLabel(self.label_text, self)
-            layout.addWidget(self.label)
-        else:
-            self.label = None
-    
-        self.spinbox = QSpinBox(self)
-        spacer = QWidget(self)
-        
-        self.spinbox.setFixedWidth(spinbox_width)
-        
-        layout.addWidget(spacer, 1)
-        layout.addWidget(self.spinbox, 0)
-        
-        self.spinbox.valueChanged.connect(self._emit_value)
-    
-    def _emit_value(self, val):
-        self.valueChanged.emit(val)
-
-    def set_value(self, val):
-        self.spinbox.setValue(val)
-        
-    def setLabelWidth(self, width):
-        """Sets the label width if the label exists."""
-        if self.label:
-            self.label.setFixedWidth(width)
-
-    def get_value(self):
-        return self.spinbox.value()
-    
-    def set_range(self, min, max):
-        self.spinbox.setMinimum(min)
-        self.spinbox.setMaximum(max)
+    def set_range(self, min_val, max_val):
+         """Sets the UI range for the slider and spinbox."""
+         self.ui_range = (min_val, max_val)
+         # Re-initialize relevant parts or update widgets directly
+         if self.slider:
+             self.slider.blockSignals(True)
+             self.slider.setRange(min_val, max_val)
+             self.slider.blockSignals(False)
+         if self.spinbox:
+             self.spinbox.blockSignals(True)
+             self.spinbox.setRange(min_val, max_val)
+             self.spinbox.blockSignals(False)
+         # Re-apply current value to ensure it's within new bounds & widgets reflect change
+         current_actual = self.get_value()
+         self.set_value(current_actual)
 
 class ColorBlock(QPushButton):
     """
@@ -686,40 +835,52 @@ INT_MAX = 2**31 - 1
 INT_MIN = -2**31
 
 class QDoubleSlider(QSlider):
-
+    """ Custom QSlider subclass to handle float values using a multiplier. """
+    # Revert signal name back to doubleValueChanged for clarity
     doubleValueChanged = Signal(float)
 
     def __init__(self, decimals=3, *args, **kargs):
         super().__init__( *args, **kargs)
         self._multi = 10 ** decimals
 
-        self.valueChanged.connect(self.emitDoubleValueChanged)
+        # Connect base class int signal to our float emitter slot
+        super().valueChanged.connect(self.emitDoubleValueChanged)
 
+    # Revert slot name
     def emitDoubleValueChanged(self):
+        """ Calculates the float value and emits the doubleValueChanged(float) signal. """
         value = float(super().value())/self._multi
         self.doubleValueChanged.emit(value)
 
+    # Override value() to return float
     def value(self):
+        """ Returns the slider's current value as a float. """
         return float(super().value()) / self._multi
 
+    # Override setMinimum/Maximum/SingleStep to accept float and convert
     def setMinimum(self, value):
-        return super().setMinimum(value * self._multi)
+        return super().setMinimum(int(value * self._multi))
 
     def setMaximum(self, value):
-        return super().setMaximum(value * self._multi)
+        return super().setMaximum(int(value * self._multi))
 
     def setSingleStep(self, value):
-        return super().setSingleStep(value * self._multi)
+        return super().setSingleStep(int(value * self._multi))
 
+    # Override singleStep() to return float
     def singleStep(self):
         return float(super().singleStep()) / self._multi
 
+    # Override setValue() to accept float, convert, clamp, and set base int value
     def setValue(self, value):
-        result = max(INT_MIN, min(value * self._multi, INT_MAX))
-        clamped_result = int(result)  # Ensures the value stays in range
+        """ Sets the slider's value using a float. """
+        int_value = int(round(value * self._multi))
+        # Clamp the integer value to the base QSlider's min/max to avoid errors
+        # Note: super().minimum() and super().maximum() return the scaled integer limits
+        clamped_int_value = max(super().minimum(), min(int_value, super().maximum()))
+        super().setValue(clamped_int_value)
 
-        super().setValue(clamped_result)
-
-    def setRange(self, min, max):
-        self.setMinimum(min)
-        self.setMaximum(max)
+    # setRange remains the same, calling our overridden setMinimum/Maximum
+    def setRange(self, min_val, max_val):
+        self.setMinimum(min_val)
+        self.setMaximum(max_val)
