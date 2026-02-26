@@ -1,9 +1,8 @@
-README.md
 pyproject.toml
-setup.py
 src/tiinyswatch/__init__.py
 src/tiinyswatch/__main__.py
 src/tiinyswatch/app.py
+src/tiinyswatch/single_application.py
 src/tiinyswatch.egg-info/PKG-INFO
 src/tiinyswatch.egg-info/SOURCES.txt
 src/tiinyswatch.egg-info/dependency_links.txt
@@ -29,9 +28,6 @@ src/tiinyswatch/color/conversions/oklab_conversions.py
 src/tiinyswatch/color/conversions/srgb_conversions.py
 src/tiinyswatch/color/conversions/xyy_conversions.py
 src/tiinyswatch/color/geometry/__init__.py
-src/tiinyswatch/color/geometry/color_arc.py
-src/tiinyswatch/color/geometry/color_poly.py
-src/tiinyswatch/color/geometry/color_tetra.py
 src/tiinyswatch/ui/__init__.py
 src/tiinyswatch/ui/dialogs/__init__.py
 src/tiinyswatch/ui/dialogs/transparent_overlay.py
@@ -41,7 +37,6 @@ src/tiinyswatch/ui/styles/__init__.py
 src/tiinyswatch/ui/styles/dark_style_sheet.py
 src/tiinyswatch/ui/styles/qt_styles.py
 src/tiinyswatch/ui/widgets/__init__.py
-src/tiinyswatch/ui/widgets/color_controls.py
 src/tiinyswatch/ui/widgets/color_picker.py
 src/tiinyswatch/ui/widgets/color_widgets.py
 src/tiinyswatch/ui/widgets/history_palette.py

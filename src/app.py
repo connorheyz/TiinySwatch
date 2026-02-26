@@ -5,13 +5,12 @@ This is a convenience script that imports the main function from the package.
 """
 
 import sys
-from PySide6.QtWidgets import QApplication
 from tiinyswatch.single_application import QtSingleApplication
 from tiinyswatch.app import App
 
 def main():
     """Start the TiinySwatch application."""
-    appGuid = 'F3FF80BA-BA05-4277-8063-82A6DB9245A2'
+    appGuid = '414cbe95-2823-478a-8cdd-d5965d913257'
     app = QtSingleApplication(appGuid, sys.argv)
     if app.isRunning(): 
         sys.exit(0)

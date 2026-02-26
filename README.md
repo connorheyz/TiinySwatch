@@ -91,18 +91,11 @@ TiinySwatch/
 │   │
 │   └── app.py                # Launch script
 │
-├── assets/                   # Static assets
-│   └── icons/                # Application icons
-│
-├── build/                    # Build artifacts
-│   └── installer/            # Installer files
-│
 ├── scripts/                  # Build and utility scripts
-├── docs/                     # Documentation
-├── tests/                    # Unit tests
 │
 ├── pyproject.toml            # Modern Python packaging
-├── setup.py                  # Legacy setup script
+├── TiinySwatch.spec          # PyInstaller build spec
+├── installer.iss             # Inno Setup installer script
 └── requirements.txt          # Dependencies
 ```
 
@@ -127,13 +120,33 @@ TiinySwatch will appear in your system tray as a single colored block. Left clic
 - The export button in the history palette exports to Paint.NET's palette format.
 - Ctrl or shift clicking in the history palette allows you to select multiple colors for picking. Some tools, like "Linear Gradient", make use of multiple color selections.
 
-## Building Installers
+## Building the Windows Installer
 
-To build a Windows MSI installer:
+Building a distributable installer is a two-step process: PyInstaller bundles the app into a standalone directory, then Inno Setup wraps it into a setup wizard.
+
+### Prerequisites
 
 ```bash
-python setup.py bdist_msi
+pip install pyinstaller
 ```
+
+You also need [Inno Setup](https://jrsoftware.org/isinfo.php) installed (adds `iscc` to your PATH).
+
+### Step 1: Build the executable
+
+```bash
+pyinstaller TiinySwatch.spec
+```
+
+This creates the bundled app in `dist/TiinySwatch/`.
+
+### Step 2: Build the installer
+
+```bash
+iscc installer.iss
+```
+
+This produces `dist/TiinySwatch-1.0.0-setup.exe`, ready to distribute.
 
 ## Development
 
