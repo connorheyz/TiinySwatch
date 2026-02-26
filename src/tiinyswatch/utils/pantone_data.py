@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import pickle
 import numpy as np
 
@@ -31,14 +32,20 @@ class PantoneData:
             cls._load_data()
             cls._is_initialized = True
         
+    @staticmethod
+    def _get_data_dir():
+        """Resolve the data directory, handling frozen (PyInstaller/cx_Freeze) builds."""
+        if getattr(sys, '_MEIPASS', None):
+            return os.path.join(sys._MEIPASS, 'tiinyswatch', 'utils')
+        return os.path.dirname(os.path.abspath(__file__))
+
     @classmethod
     def _load_data(cls):
         """
         Load Pantone data using the fastest available method.
         Order of preference: numpy mmap > pickle > JSON.
         """
-        # Path to data files
-        utils_dir = os.path.dirname(__file__)
+        utils_dir = cls._get_data_dir()
         np_path = os.path.join(utils_dir, 'pantone-xyz-colors.npz')  # Use .npz instead of .npy
         old_np_path = os.path.join(utils_dir, 'pantone-xyz-colors.npy')  # Legacy format
         pickle_path = os.path.join(utils_dir, 'pantone-xyz-colors.pkl')
@@ -168,7 +175,7 @@ class PantoneData:
         from colormath.color_conversions import convert_color
         
         # Load the Pantone colors from the JSON file
-        json_path = os.path.join(os.path.dirname(__file__), 'pantone-colors.json')
+        json_path = os.path.join(cls._get_data_dir(), 'pantone-colors.json')
         with open(json_path, 'r') as f:
             data = json.load(f)
             
@@ -226,7 +233,7 @@ class PantoneData:
         print(f"Successfully processed {len(names)} Pantone colors")
             
         # Save in multiple formats
-        utils_dir = os.path.dirname(__file__)
+        utils_dir = cls._get_data_dir()
         
         # Save as JSON (most compatible)
         xyz_json_path = os.path.join(utils_dir, 'pantone-xyz-colors.json')

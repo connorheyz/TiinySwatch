@@ -41,4 +41,4 @@ package-dir = {"" = "src"}
 packages = ["tiinyswatch"]
 
 [tool.setuptools.package-data]
-tiinyswatch = ["assets/icons/*"] 
+tiinyswatch = ["utils/pantone-colors.json"]
