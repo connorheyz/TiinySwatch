@@ -176,7 +176,8 @@ class Settings:
     def appendToHistory(cls, color: QColorEnhanced) -> None:
         """Add a color to the history."""
         colors = cls.get('colors', [])
-        colors.insert(0, color)
+        # Store a snapshot so future edits to the current color don't mutate history entries.
+        colors.insert(0, color.clone())
         if len(colors) > 30:  # Limit history size
             colors = colors[:30]
         cls.set('colors', colors)

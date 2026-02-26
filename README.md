@@ -122,31 +122,31 @@ TiinySwatch will appear in your system tray as a single colored block. Left clic
 
 ## Building the Windows Installer
 
-Building a distributable installer is a two-step process: PyInstaller bundles the app into a standalone directory, then Inno Setup wraps it into a setup wizard.
+Building a distributable installer is a two-step process: PyInstaller bundles the app into a standalone directory, then Inno Setup wraps it into a single setup `.exe`.
 
 ### Prerequisites
 
-```bash
-pip install pyinstaller
-```
+- Python 3.9+
+- [Inno Setup 6](https://jrsoftware.org/isdl.php) (adds `iscc` to your PATH)
 
-You also need [Inno Setup](https://jrsoftware.org/isinfo.php) installed (adds `iscc` to your PATH).
-
-### Step 1: Build the executable
+### Build steps
 
 ```bash
+# Create a clean virtual environment for the build
+python -m venv venv
+venv\Scripts\activate
+
+# Install dependencies + PyInstaller
+pip install -r requirements.txt pyinstaller
+
+# Bundle the app
 pyinstaller TiinySwatch.spec
-```
 
-This creates the bundled app in `dist/TiinySwatch/`.
-
-### Step 2: Build the installer
-
-```bash
+# Package into an installer
 iscc installer.iss
 ```
 
-This produces `dist/TiinySwatch-1.0.0-setup.exe`, ready to distribute.
+The final installer is written to `dist\TiinySwatch-1.0.0-setup.exe`.
 
 ## Development
 

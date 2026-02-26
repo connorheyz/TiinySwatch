@@ -99,6 +99,14 @@ class HistoryPalette(QWidget):
         self.clearColorGrid()
         self.colorButtons = []
         colors = Settings.get("colors", [])
+        if not colors:
+            self.currentSelectedButton = -1
+            self.selectedIndices = []
+            self.anchorIndex = -1
+        elif self.currentSelectedButton >= len(colors):
+            self.currentSelectedButton = len(colors) - 1
+            self.selectedIndices = [self.currentSelectedButton]
+            self.anchorIndex = self.currentSelectedButton
         for index, color in enumerate(colors):
             self.addColorButton(index, color)
         self.addSpacersIfNeeded(len(colors))
@@ -194,7 +202,7 @@ class HistoryPalette(QWidget):
             self.anchorIndex = new_index
 
         self.currentSelectedButton = new_index
-        Settings.set("currentColors", [colors[new_index]])
+        Settings.set("currentColors", [colors[new_index].clone()])
         self.updateColors()
 
     def handleDeleteKey(self):
