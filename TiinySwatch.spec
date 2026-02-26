@@ -40,6 +40,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='TiinySwatch',
+    icon=os.path.join('assets', 'icons', 'TiinySwatch.ico'),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
