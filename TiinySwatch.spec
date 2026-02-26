@@ -2,9 +2,15 @@
 
 import os
 
+utils_src = os.path.join('src', 'tiinyswatch', 'utils')
+utils_dst = os.path.join('tiinyswatch', 'utils')
+
 datas = [
-    (os.path.join('src', 'tiinyswatch', 'utils', 'pantone-colors.json'),
-     os.path.join('tiinyswatch', 'utils')),
+    (os.path.join(utils_src, 'pantone-colors.json'), utils_dst),
+    (os.path.join(utils_src, 'pantone-xyz-colors.json'), utils_dst),
+    (os.path.join(utils_src, 'pantone-xyz-colors.npz'), utils_dst),
+    (os.path.join(utils_src, 'pantone-xyz-colors.pkl'), utils_dst),
+    (os.path.join(utils_src, 'pantone-xyz-colors.npy'), utils_dst),
 ]
 
 a = Analysis(
