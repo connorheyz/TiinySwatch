@@ -125,11 +125,11 @@ class App(QMainWindow):
 
     def toggleColorPick(self) -> None:
         """Start the color picking process."""
-        screen = QGuiApplication.primaryScreen()
-        screenshot = screen.grabWindow(0).toImage()
+        screen = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
+        screenshot = screen.grabWindow(0)
         
         if not self.overlay:
-            self.overlay = TransparentOverlay(self, screenshot)
+            self.overlay = TransparentOverlay(self, screenshot, target_screen=screen)
             self.overlay.show()
             self.overlayToggled = True
         else:
