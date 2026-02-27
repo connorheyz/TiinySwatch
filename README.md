@@ -2,6 +2,8 @@
 
 A color picker and manager application built with PySide6.
 
+**Website:** [https://connorheyz.github.io/TiinySwatch/](https://connorheyz.github.io/TiinySwatch/)
+
 ## Installation
 
 ### Development Mode
