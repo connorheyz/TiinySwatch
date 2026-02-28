@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tiinyswatch"
-version = "1.0.0"
+version = "1.0.1"
 description = "A lightweight color picker and color management application"
 readme = "README.md"
 authors = [
