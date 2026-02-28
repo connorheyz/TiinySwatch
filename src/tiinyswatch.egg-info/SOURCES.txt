@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 src/tiinyswatch/__init__.py
 src/tiinyswatch/__main__.py
@@ -44,5 +45,6 @@ src/tiinyswatch/utils/__init__.py
 src/tiinyswatch/utils/clipboard_manager.py
 src/tiinyswatch/utils/keybind_manager.py
 src/tiinyswatch/utils/notification_manager.py
+src/tiinyswatch/utils/pantone-colors.json
 src/tiinyswatch/utils/pantone_data.py
 src/tiinyswatch/utils/settings.py

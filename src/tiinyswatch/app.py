@@ -14,7 +14,7 @@ from tiinyswatch.utils.notification_manager import NotificationManager
 from tiinyswatch.ui.dialogs.transparent_overlay import TransparentOverlay
 from tiinyswatch.ui.widgets.color_picker import ColorPicker
 from tiinyswatch.ui.menus.settings_menu import SettingsMenu
-from tiinyswatch.ui.styles import DARK_STYLE
+from tiinyswatch.ui.styles import get_dark_style
 
 
 class App(QMainWindow):
@@ -48,7 +48,7 @@ class App(QMainWindow):
         self.overlayToggled = False
         
         # Apply styles
-        self.setStyleSheet(DARK_STYLE)
+        self.setStyleSheet(get_dark_style())
         
         # We'll initialize UI in a slightly staggered way
         # 1. First create the minimal required UI for the app to appear responsive

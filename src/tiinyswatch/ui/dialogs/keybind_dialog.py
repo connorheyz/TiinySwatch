@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent, QFontMetrics, QKeySequence
-from tiinyswatch.ui.styles import DARK_STYLE
+from tiinyswatch.ui.styles import get_dark_style
 from tiinyswatch.utils.keybind_manager import KeybindManager
 
 
@@ -19,7 +19,7 @@ class KeybindDialog(QDialog):
     def __init__(self, parent=None, title="Capture Keybind", prompt="Press a key or key combination:"):
         super().__init__(parent, Qt.WindowStaysOnTopHint)
         self.setWindowTitle(title)
-        self.setStyleSheet(DARK_STYLE)
+        self.setStyleSheet(get_dark_style())
         self.setModal(True)
         
         # Initialize attributes

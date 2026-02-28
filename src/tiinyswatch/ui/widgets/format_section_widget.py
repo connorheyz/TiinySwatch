@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
 )
 from tiinyswatch.color import QColorEnhanced
 from tiinyswatch.ui.widgets.color_widgets import CircularButton
+import tiinyswatch.ui.icons as icons
 
 # --- Format Section Widget ---
 class FormatSectionWidget(QWidget):
@@ -32,7 +33,7 @@ class FormatSectionWidget(QWidget):
         fmtButton.setFixedSize(120, 20)
         sectionHeader.addWidget(fmtButton)
         sectionHeader.addStretch()
-        minusButton = CircularButton("-", self)
+        minusButton = CircularButton(icons.minus_icon(), self)
         minusButton.clicked.connect(lambda: self.remove_format_cb(self.section_index))
         sectionHeader.addWidget(minusButton)
         sectionLayout.addLayout(sectionHeader)

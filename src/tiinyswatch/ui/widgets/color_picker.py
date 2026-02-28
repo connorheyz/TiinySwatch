@@ -1,5 +1,5 @@
 from functools import partial
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QApplication, QLabel, QFrame, QHBoxLayout, QPushButton, QVBoxLayout, 
     QWidget, QMenu, QSizePolicy, QLayout
@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QCursor
 
 import tiinyswatch.ui.styles as styles
+import tiinyswatch.ui.icons as icons
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.notification_manager import NotificationManager
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
@@ -80,7 +81,7 @@ class ColorPicker(QWidget):
     # Window Setup
     # ------------------------------
     def initWindow(self):
-        self.setStyleSheet(styles.DARK_STYLE)
+        self.setStyleSheet(styles.get_dark_style())
         self.setWindowFlags(ColorPicker.WINDOW_FLAGS)
         self.setMouseTracking(True)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
@@ -133,9 +134,13 @@ class ColorPicker(QWidget):
         layout = QHBoxLayout(header)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        self.arrowButton = QPushButton("◄", objectName="ArrowButton")
+        self.arrowButton = QPushButton(objectName="ArrowButton")
+        self.arrowButton.setIcon(icons.arrow_left_icon())
+        self.arrowButton.setIconSize(QSize(14, 14))
         self.titleLabel = QLabel("TiinySwatch", objectName="TitleText", alignment=Qt.AlignCenter)
-        self.closeButton = QPushButton("X", objectName="CloseButton")
+        self.closeButton = QPushButton(objectName="CloseButton")
+        self.closeButton.setIcon(icons.close_icon())
+        self.closeButton.setIconSize(QSize(14, 14))
         layout.addWidget(self.arrowButton)
         layout.addWidget(self.titleLabel)
         layout.addStretch()
@@ -169,7 +174,7 @@ class ColorPicker(QWidget):
         if len(self.format_sections) < 4:
             plusLayout = QHBoxLayout()
             plusLayout.addStretch()
-            plusButton = CircularButton("+", self)
+            plusButton = CircularButton(icons.plus_icon(), self)
             plusButton.clicked.connect(self.addFormat)
             plusLayout.addWidget(plusButton)
             self.formatContainer.addLayout(plusLayout)
@@ -209,7 +214,7 @@ class ColorPicker(QWidget):
         if not available:
             return
         menu = QMenu(self)
-        menu.setStyleSheet(styles.DARK_STYLE)
+        menu.setStyleSheet(styles.get_dark_style())
         # Create submenus for each category.
         for category, formats in ColorPicker.FORMAT_CATEGORIES.items():
             submenu = menu.addMenu(category)
@@ -306,7 +311,7 @@ class ColorPicker(QWidget):
 
     def showFormatPopup(self, section_index):
         menu = QMenu(self)
-        menu.setStyleSheet(styles.DARK_STYLE)
+        menu.setStyleSheet(styles.get_dark_style())
         current_fmt = self.format_sections[section_index]
         # Build submenus based on the defined categories.
         for category, formats in ColorPicker.FORMAT_CATEGORIES.items():

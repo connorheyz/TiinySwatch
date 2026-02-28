@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QGridLayout, QLabel, QSpacerItem, QSizePolicy, QHBoxLayout,
     QPushButton, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QApplication
@@ -9,6 +9,7 @@ from functools import partial
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
 import tiinyswatch.ui.styles as styles
+import tiinyswatch.ui.icons as icons
 
 class HistoryPalette(QWidget):
     COPY_SHORTCUT = "Ctrl+C"
@@ -42,7 +43,7 @@ class HistoryPalette(QWidget):
         self.setupConnections()
 
     def initializeWindow(self):
-        self.setStyleSheet(styles.DARK_STYLE)
+        self.setStyleSheet(styles.get_dark_style())
         self.setMouseTracking(True)
         self.setWindowFlags(self.WINDOW_FLAGS)
 
@@ -70,7 +71,9 @@ class HistoryPalette(QWidget):
         topLayout = QHBoxLayout(topWidget)
         topLayout.setContentsMargins(10, 0, 0, 0)
         title = QLabel("History Palette", self)
-        closeButton = QPushButton("X", self)
+        closeButton = QPushButton(self)
+        closeButton.setIcon(icons.close_icon())
+        closeButton.setIconSize(QSize(14, 14))
         closeButton.clicked.connect(self.closeWindow)
         closeButton.setStyleSheet(self.STYLES['CLOSE_BUTTON'])
         topLayout.addWidget(title)

@@ -1,10 +1,11 @@
 from PySide6.QtWidgets import QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QWidget, QLabel, QHBoxLayout, QPushButton, QGraphicsOpacityEffect
 from PySide6.QtGui import QFont, QFontMetrics
+from PySide6.QtCore import Qt, QSize, QPropertyAnimation, QAbstractAnimation, Property, QEasingCurve, QEvent, Signal, QTimer
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
+import tiinyswatch.ui.icons as icons
 from tiinyswatch.utils.notification_manager import NotificationType
 from tiinyswatch.color import QColorEnhanced
 from functools import partial
-from PySide6.QtCore import Qt, QPropertyAnimation, QAbstractAnimation, Property, QEasingCurve, QEvent, Signal, QTimer
 
 class ClickableLineEdit(QLineEdit):
     """
@@ -679,13 +680,16 @@ class ExpandableColorBlocksWidget(QWidget):
         return [block.color for block in self.blocks]
     
 class CircularButton(QPushButton):
-    def __init__(self, text="", parent=None):
-        super().__init__(text, parent)
+    def __init__(self, icon=None, parent=None):
+        super().__init__(parent)
         self.setFixedSize(16, 16)
-        self.setFont(QFont("Arial", 8))
+        if icon:
+            self.setIcon(icon)
+            self.setIconSize(QSize(10, 10))
+        self.setCursor(Qt.PointingHandCursor)
         self.setStyleSheet(
-            "QPushButton { border: 1px solid #DDD; border-radius: 8px; color: #DDD; background: transparent; padding: none; text-align: center }"
-            "QPushButton:hover { background-color: #444; }"
+            "QPushButton { border: 1px solid #888; border-radius: 8px; background: transparent; }"
+            "QPushButton:hover { background-color: #444; border-color: #DDD; }"
         )
 
 class LineEdit(QLineEdit):
@@ -732,9 +736,11 @@ class NotificationBanner(QWidget):
         layout.setContentsMargins(10, 5, 10, 5)
         layout.setSpacing(10)
         
-        self.closeButton = QPushButton("X", self)
+        self.closeButton = QPushButton(self)
         self.closeButton.setFixedSize(20, 20)
-        self.closeButton.setStyleSheet("color: white; background: transparent; border: none;")
+        self.closeButton.setIcon(icons.close_icon(size=14))
+        self.closeButton.setIconSize(QSize(14, 14))
+        self.closeButton.setStyleSheet("background: transparent; border: none;")
         self.closeButton.clicked.connect(self.hideBanner)
         layout.addWidget(self.closeButton)
         

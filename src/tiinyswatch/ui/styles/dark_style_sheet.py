@@ -4,6 +4,7 @@ DARK_STYLE = """
 QWidget {
     background-color: #313338;
     color: #DDD;
+    font-family: "Segoe UI", sans-serif;
 }
 
 QSpinBox, QDoubleSpinBox {
@@ -15,8 +16,12 @@ QSpinBox, QDoubleSpinBox {
 
 QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
     background-color: #444;
-    color: white;
-    padding: 5px;
+    border: none;
+    width: 16px;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover, QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+    background-color: #555;
 }
 
 QLabel {
@@ -39,7 +44,7 @@ QSlider::handle:horizontal {
 }
 
 QPushButton {
-    padding: 5px 15px;  /* Adjust as needed */
+    padding: 5px 15px;
     background-color: #555555;
     border: none;
 }
@@ -48,6 +53,7 @@ QPushButton#CloseButton {
     background-color: transparent; 
     border: none; 
     color: white;
+    padding: 5px 8px;
 }
 
 QPushButton#CloseButton:hover {
@@ -59,6 +65,7 @@ QPushButton#ArrowButton {
     background-color: transparent; 
     border: none; 
     color: white;
+    padding: 5px 8px;
 }
 
 QPushButton#FormatLabel {
@@ -85,6 +92,7 @@ QWidget#TopBar {
 QLabel#TitleText {
     color: white;
     background-color: transparent;
+    margin-left: 8px;
 }
 
 QDialog#TransparentOverlay {
@@ -124,3 +132,30 @@ QMenu::icon {
     padding: 5px;
 }
 """
+
+_full_style = None
+
+def get_dark_style():
+    """Get the full dark stylesheet including spinbox arrow images.
+    Must be called after QApplication is created.
+    """
+    global _full_style
+    if _full_style is not None:
+        return _full_style
+
+    from tiinyswatch.ui.icons import create_spinbox_arrow_images
+    up_path, down_path = create_spinbox_arrow_images()
+
+    _full_style = DARK_STYLE + f"""
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    image: url({up_path});
+    width: 8px;
+    height: 8px;
+}}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    image: url({down_path});
+    width: 8px;
+    height: 8px;
+}}
+"""
+    return _full_style
