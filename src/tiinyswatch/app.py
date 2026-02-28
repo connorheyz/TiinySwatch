@@ -47,9 +47,8 @@ class App(QMainWindow):
         self.pickerToggled = False
         self.overlayToggled = False
         
-        # Apply styles
         self.setStyleSheet(get_dark_style())
-        
+
         # We'll initialize UI in a slightly staggered way
         # 1. First create the minimal required UI for the app to appear responsive
         self.initializeMinimalUI()

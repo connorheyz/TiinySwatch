@@ -8,11 +8,12 @@ import os
 import tempfile
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import QIcon, QPixmap, QPainter, QPen, QColor, QPolygonF, QBrush
+from tiinyswatch.ui.styles.dark_style_sheet import TEXT_SECONDARY
 
 _arrow_cache = {}
 
 
-def plus_icon(size=16, color="#DDD"):
+def plus_icon(size=16, color=TEXT_SECONDARY):
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
@@ -20,7 +21,7 @@ def plus_icon(size=16, color="#DDD"):
     pen = QPen(QColor(color))
     pen.setWidthF(1.5)
     painter.setPen(pen)
-    margin = size * 0.25
+    margin = size * 0.18
     center = size / 2
     painter.drawLine(QPointF(center, margin), QPointF(center, size - margin))
     painter.drawLine(QPointF(margin, center), QPointF(size - margin, center))
@@ -28,22 +29,7 @@ def plus_icon(size=16, color="#DDD"):
     return QIcon(pixmap)
 
 
-def minus_icon(size=16, color="#DDD"):
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.Antialiasing)
-    pen = QPen(QColor(color))
-    pen.setWidthF(1.5)
-    painter.setPen(pen)
-    margin = size * 0.25
-    center = size / 2
-    painter.drawLine(QPointF(margin, center), QPointF(size - margin, center))
-    painter.end()
-    return QIcon(pixmap)
-
-
-def close_icon(size=16, color="white"):
+def close_icon(size=16, color=TEXT_SECONDARY):
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
@@ -58,7 +44,7 @@ def close_icon(size=16, color="white"):
     return QIcon(pixmap)
 
 
-def arrow_left_icon(size=16, color="white"):
+def arrow_left_icon(size=16, color=TEXT_SECONDARY):
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
@@ -90,7 +76,7 @@ def create_spinbox_arrow_images():
     down_path = os.path.join(icon_dir, "spinbox_down.png")
 
     size = 12
-    color = QColor("#CCC")
+    color = QColor(TEXT_SECONDARY)
     margin = 3
 
     pixmap = QPixmap(size, size)

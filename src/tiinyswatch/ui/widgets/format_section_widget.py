@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame
 )
 from tiinyswatch.color import QColorEnhanced
-from tiinyswatch.ui.widgets.color_widgets import CircularButton
+from tiinyswatch.ui.widgets.color_widgets import IconButton
 import tiinyswatch.ui.icons as icons
 
 # --- Format Section Widget ---
@@ -33,15 +33,15 @@ class FormatSectionWidget(QWidget):
         fmtButton.setFixedSize(120, 20)
         sectionHeader.addWidget(fmtButton)
         sectionHeader.addStretch()
-        minusButton = CircularButton(icons.minus_icon(), self)
-        minusButton.clicked.connect(lambda: self.remove_format_cb(self.section_index))
-        sectionHeader.addWidget(minusButton)
+        removeButton = IconButton(icons.close_icon(), self)
+        removeButton.clicked.connect(lambda: self.remove_format_cb(self.section_index))
+        sectionHeader.addWidget(removeButton)
         sectionLayout.addLayout(sectionHeader)
 
         # Divider
-        divider = QFrame()
+        divider = QFrame(objectName="Divider")
         divider.setFrameShape(QFrame.HLine)
-        divider.setFrameShadow(QFrame.Sunken)
+        divider.setFrameShadow(QFrame.Plain)
         sectionLayout.addWidget(divider)
 
         # Controls

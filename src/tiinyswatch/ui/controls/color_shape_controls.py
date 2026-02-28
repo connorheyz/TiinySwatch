@@ -208,9 +208,8 @@ class LinearGradientControl(ColorShapeControl):
         layout.addWidget(self.preview_container)
 
         # --- CSS Gradient Toggle Button ---
-        self.css_dropdown = QPushButton("css gradients ▲", self.container)
+        self.css_dropdown = QPushButton("css gradients ▲", self.container, objectName="CssDropdown")
         self.css_dropdown.setFlat(True)
-        self.css_dropdown.setStyleSheet("color: #ddd; background-color: transparent;")
         self.css_dropdown.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.css_dropdown.clicked.connect(self.toggle_css_visibility)
         layout.addWidget(self.css_dropdown, alignment=Qt.AlignCenter)

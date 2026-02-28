@@ -1,7 +1,6 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QWidget, QSizePolicy
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent, QFontMetrics, QKeySequence
-from tiinyswatch.ui.styles import get_dark_style
 from tiinyswatch.utils.keybind_manager import KeybindManager
 
 
@@ -19,7 +18,6 @@ class KeybindDialog(QDialog):
     def __init__(self, parent=None, title="Capture Keybind", prompt="Press a key or key combination:"):
         super().__init__(parent, Qt.WindowStaysOnTopHint)
         self.setWindowTitle(title)
-        self.setStyleSheet(get_dark_style())
         self.setModal(True)
         
         # Initialize attributes
@@ -75,7 +73,7 @@ class KeybindDialog(QDialog):
     def initUI(self):
         """Set up the dialog UI components."""
         layout = QVBoxLayout()
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setContentsMargins(15, 15, 15, 0)
         layout.setSpacing(10)
         
         # Instruction label
@@ -84,28 +82,28 @@ class KeybindDialog(QDialog):
         layout.addWidget(self.prompt_label)
         
         # Current keybind display
-        self.keybind_label = QLabel("Press any key...")
+        self.keybind_label = QLabel("Press any key...", objectName="KeybindDisplay")
         self.keybind_label.setAlignment(Qt.AlignCenter)
         self.keybind_label.setMinimumHeight(40)
-        self.keybind_label.setStyleSheet("font-size: 14pt; font-weight: bold; padding: 8px; background-color: #444; border: 1px solid white;")
         layout.addWidget(self.keybind_label)
         
-        # Buttons layout
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(8)
-        
-        # Clear button
-        self.clear_button = QPushButton("Clear")
+        footer = QWidget(objectName="FooterBar")
+        footerLayout = QHBoxLayout(footer)
+        footerLayout.setContentsMargins(0, 0, 0, 0)
+        footerLayout.setSpacing(0)
+
+        self.clear_button = QPushButton("Clear", objectName="FooterButton")
         self.clear_button.clicked.connect(self.clearKeybind)
-        button_layout.addWidget(self.clear_button)
-        
-        # OK button
-        self.ok_button = QPushButton("OK")
-        self.ok_button.setEnabled(False)  # Disabled until a key is pressed
+        self.clear_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        footerLayout.addWidget(self.clear_button)
+
+        self.ok_button = QPushButton("OK", objectName="FooterButtonLast")
+        self.ok_button.setEnabled(False)
         self.ok_button.clicked.connect(self.acceptKeybind)
-        button_layout.addWidget(self.ok_button)
-        
-        layout.addLayout(button_layout)
+        self.ok_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        footerLayout.addWidget(self.ok_button)
+
+        layout.addWidget(footer)
         
         # Set layout
         self.setLayout(layout)

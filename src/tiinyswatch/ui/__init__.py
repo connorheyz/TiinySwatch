@@ -3,14 +3,12 @@
 from .dialogs import TransparentOverlay
 from .widgets import ColorPicker, HistoryPalette
 from .menus import SettingsMenu
-from .styles import DARK_STYLE, get_dark_style, SliderProxyStyle
+from .styles import SliderProxyStyle
 
 __all__ = [
     'TransparentOverlay',
     'ColorPicker',
     'HistoryPalette',
     'SettingsMenu',
-    'DARK_STYLE',
-    'get_dark_style',
     'SliderProxyStyle'
 ] 

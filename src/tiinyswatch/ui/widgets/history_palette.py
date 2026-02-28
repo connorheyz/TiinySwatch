@@ -1,37 +1,30 @@
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QGridLayout, QLabel, QSpacerItem, QSizePolicy, QHBoxLayout,
-    QPushButton, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QApplication
+    QPushButton, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QApplication, QLayout,
 )
 from PySide6 import QtCore
-from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut, QPainter, QPen
+from PySide6.QtGui import QKeyEvent, QKeySequence, QShortcut, QPainter, QPen, QColor
 from functools import partial
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
-import tiinyswatch.ui.styles as styles
 import tiinyswatch.ui.icons as icons
+from tiinyswatch.ui.widgets.color_widgets import TopBarButton
 
 class HistoryPalette(QWidget):
     COPY_SHORTCUT = "Ctrl+C"
     WINDOW_FLAGS = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | QtCore.Qt.Tool
     GRID_COLUMNS = 5
     BUTTON_SIZE = 30
+    GRID_MARGIN = 15
+    GRID_SPACING = 5
+    BORDER_MARGIN = 1
 
-    STYLES = {
-        'CLOSE_BUTTON': """
-            QPushButton:hover {
-                background-color: #ef5858;
-            }
-        """,
-        'TOP_BAR': "background-color: #1e1f22;",
-        # The following styles are kept for buttons in their normal or current state.
-        'SELECTED_COLOR': lambda color: f"background-color: {color}; border: 2px solid white",
-        'NORMAL_COLOR': lambda color: f"background-color: {color}; border: none"
-    }
+    SELECTED_COLOR_STYLE = staticmethod(lambda color: f"background-color: {color}; border: 2px solid white")
+    NORMAL_COLOR_STYLE = staticmethod(lambda color: f"background-color: {color}; border: none")
 
     def __init__(self, parent=None):
-        super().__init__(None, objectName="HistoryPalette")
-        self.parent = parent
+        super().__init__(parent, objectName="HistoryPalette")
         self.lastMousePosition = None
         self.currentSelectedButton = -1
         self.anchorIndex = -1  # Track selection anchor
@@ -43,9 +36,14 @@ class HistoryPalette(QWidget):
         self.setupConnections()
 
     def initializeWindow(self):
-        self.setStyleSheet(styles.get_dark_style())
         self.setMouseTracking(True)
         self.setWindowFlags(self.WINDOW_FLAGS)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setFocusPolicy(Qt.StrongFocus)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.setFocus()
 
     def setupConnections(self):
         self.copyShortcut = QShortcut(QKeySequence(self.COPY_SHORTCUT), self)
@@ -57,8 +55,17 @@ class HistoryPalette(QWidget):
         ClipboardManager.copyColorsToClipboard(self.selectedIndices)
 
     def setupUI(self):
+        self._fixed_width = (self.GRID_COLUMNS * self.BUTTON_SIZE
+                             + (self.GRID_COLUMNS - 1) * self.GRID_SPACING
+                             + self.GRID_MARGIN * 2
+                             + self.BORDER_MARGIN * 2)
+        self._min_height = (32 + self.BUTTON_SIZE + self.GRID_MARGIN * 2
+                            + 34 + self.BORDER_MARGIN * 2)
+
         mainLayout = QVBoxLayout(self)
-        mainLayout.setContentsMargins(0, 0, 0, 0)
+        mainLayout.setContentsMargins(1, 1, 1, 1)
+        mainLayout.setSpacing(0)
+        mainLayout.setSizeConstraint(QLayout.SetFixedSize)
         self.createTopBar(mainLayout)
         self.createColorGrid(mainLayout)
         self.createBottomBar(mainLayout)
@@ -66,16 +73,13 @@ class HistoryPalette(QWidget):
         self.updateColors()
 
     def createTopBar(self, parentLayout):
-        topWidget = QWidget(self)
-        topWidget.setStyleSheet(self.STYLES['TOP_BAR'])
+        topWidget = QWidget(self, objectName="TopBar")
+        topWidget.setFixedHeight(32)
         topLayout = QHBoxLayout(topWidget)
         topLayout.setContentsMargins(10, 0, 0, 0)
         title = QLabel("History Palette", self)
-        closeButton = QPushButton(self)
-        closeButton.setIcon(icons.close_icon())
-        closeButton.setIconSize(QSize(14, 14))
+        closeButton = TopBarButton(icons.close_icon, "CloseButton", self)
         closeButton.clicked.connect(self.closeWindow)
-        closeButton.setStyleSheet(self.STYLES['CLOSE_BUTTON'])
         topLayout.addWidget(title)
         topLayout.addStretch()
         topLayout.addWidget(closeButton)
@@ -83,25 +87,44 @@ class HistoryPalette(QWidget):
 
     def createColorGrid(self, parentLayout):
         self.colorGrid = QGridLayout()
-        self.colorGrid.setContentsMargins(15, 5, 15, 5)
-        self.colorGrid.setSpacing(5)
+        self.colorGrid.setContentsMargins(
+            self.GRID_MARGIN, self.GRID_MARGIN, self.GRID_MARGIN, self.GRID_MARGIN)
+        self.colorGrid.setSpacing(self.GRID_SPACING)
         parentLayout.addLayout(self.colorGrid)
 
     def createBottomBar(self, parentLayout):
-        bottomBar = QHBoxLayout()
-        bottomBar.setContentsMargins(15, 0, 15, 15)
-        exportBtn = QPushButton("Export", self)
+        footer = QWidget(self, objectName="FooterBar")
+        footer.setFixedHeight(34)
+        footerLayout = QHBoxLayout(footer)
+        footerLayout.setContentsMargins(0, 0, 0, 0)
+        footerLayout.setSpacing(0)
+        exportBtn = QPushButton("Export", self, objectName="FooterButton")
+        exportBtn.setFocusPolicy(Qt.NoFocus)
         exportBtn.clicked.connect(self.exportPalette)
-        trashBtn = QPushButton("Clear All", self)
+        exportBtn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        trashBtn = QPushButton("Clear All", self, objectName="FooterButtonLast")
+        trashBtn.setFocusPolicy(Qt.NoFocus)
         trashBtn.clicked.connect(lambda: Settings.set("colors", []))
-        bottomBar.addWidget(exportBtn)
-        bottomBar.addWidget(trashBtn)
-        parentLayout.addLayout(bottomBar)
+        trashBtn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        footerLayout.addWidget(exportBtn)
+        footerLayout.addWidget(trashBtn)
+        parentLayout.addWidget(footer)
 
     def updateColors(self, _=None):
         self.clearColorGrid()
         self.colorButtons = []
         colors = Settings.get("colors", [])
+        # When history grows (e.g. after Ctrl+S), shift selection so the same items stay selected.
+        prev_len = getattr(self, "_prev_history_len", None)
+        if prev_len is not None and len(colors) > prev_len:
+            added = len(colors) - prev_len
+            self.selectedIndices = [i + added for i in self.selectedIndices if 0 <= i + added < len(colors)]
+            if self.currentSelectedButton >= 0:
+                self.currentSelectedButton = min(len(colors) - 1, self.currentSelectedButton + added)
+            if self.anchorIndex >= 0:
+                self.anchorIndex = min(len(colors) - 1, self.anchorIndex + added)
+        self._prev_history_len = len(colors)
+
         if not colors:
             self.currentSelectedButton = -1
             self.selectedIndices = []
@@ -114,26 +137,33 @@ class HistoryPalette(QWidget):
             self.addColorButton(index, color)
         self.addSpacersIfNeeded(len(colors))
         self.adjustSize()
-        self.update()  # Trigger a repaint to update the selection outline
+        self.update()
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setWidth(self._fixed_width)
+        hint.setHeight(max(hint.height(), self._min_height))
+        return hint
 
     def clearColorGrid(self):
         while self.colorGrid.count():
             item = self.colorGrid.takeAt(0)
             widget = item.widget()
             if widget:
-                widget.deleteLater()
+                widget.setParent(None)
 
     def addColorButton(self, index, color):
         row, col = divmod(index, self.GRID_COLUMNS)
         colorBtn = QPushButton(self)
         colorBtn.setFixedSize(self.BUTTON_SIZE, self.BUTTON_SIZE)
+        colorBtn.setFocusPolicy(Qt.NoFocus)
         
         # Instead of per-button selection borders, we only mark the current button.
         is_current = index == self.currentSelectedButton
         if is_current:
-            style = self.STYLES['SELECTED_COLOR'](color.name())
+            style = self.SELECTED_COLOR_STYLE(color.name())
         else:
-            style = self.STYLES['NORMAL_COLOR'](color.name())
+            style = self.NORMAL_COLOR_STYLE(color.name())
         colorBtn.setStyleSheet(style)
         self.colorButtons.append(colorBtn)
         self.colorGrid.addWidget(colorBtn, row, col)
@@ -168,18 +198,26 @@ class HistoryPalette(QWidget):
         Settings.set("currentColors", self.getColors(new_selected))
         if Settings.get("CLIPBOARD"):
             self.copyCurrentColors()
-        self.updateColors()
+        self._refreshSelectionStyles()
+
+    def _refreshSelectionStyles(self):
+        """Update button border styles and repaint selection outlines
+        without rebuilding the grid."""
+        colors = Settings.get("colors", [])
+        for i, btn in enumerate(self.colorButtons):
+            if i < len(colors):
+                is_current = i == self.currentSelectedButton
+                if is_current:
+                    btn.setStyleSheet(self.SELECTED_COLOR_STYLE(colors[i].name()))
+                else:
+                    btn.setStyleSheet(self.NORMAL_COLOR_STYLE(colors[i].name()))
+        self.update()
 
     def getColors(self, indices):
         colors = Settings.get("colors", [])
-        selectedColors = []
         if not colors:
-            return
-        
-        for i in indices:
-            selectedColors.append(colors[i].clone())
-
-        return selectedColors
+            return []
+        return [colors[i].clone() for i in indices if i < len(colors)]
 
 
     def moveSelection(self, step):
@@ -205,8 +243,8 @@ class HistoryPalette(QWidget):
             self.anchorIndex = new_index
 
         self.currentSelectedButton = new_index
-        Settings.set("currentColors", [colors[new_index].clone()])
-        self.updateColors()
+        Settings.set("currentColors", self.getColors(self.selectedIndices))
+        self._refreshSelectionStyles()
 
     def handleDeleteKey(self):
         if not self.selectedIndices:
@@ -214,26 +252,27 @@ class HistoryPalette(QWidget):
         
         colors = Settings.get("colors", [])
         new_colors = [c for i, c in enumerate(colors) if i not in self.selectedIndices]
-        Settings.set("colors", new_colors)
         self.selectedIndices = []
         self.anchorIndex = -1
         self.currentSelectedButton = 0 if new_colors else -1
-        self.updateColors()
+        Settings.set("colors", new_colors)
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Delete:
             self.handleDeleteKey()
-        else:
-            step = {
-                Qt.Key_Left: -1,
-                Qt.Key_Right: 1,
-                Qt.Key_Up: -self.GRID_COLUMNS,
-                Qt.Key_Down: self.GRID_COLUMNS
-            }.get(event.key())
-            if step is not None:
-                self.moveSelection(step)
-            else:
-                super().keyPressEvent(event)
+            event.accept()
+            return
+        step = {
+            Qt.Key_Left: -1,
+            Qt.Key_Right: 1,
+            Qt.Key_Up: -self.GRID_COLUMNS,
+            Qt.Key_Down: self.GRID_COLUMNS
+        }.get(event.key())
+        if step is not None:
+            self.moveSelection(step)
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def addSpacersIfNeeded(self, colorCount):
         if colorCount % self.GRID_COLUMNS:
@@ -273,36 +312,45 @@ class HistoryPalette(QWidget):
 
     def closeWindow(self):
         self.close()
-        if self.parent:
-            self.parent.historyToggled = False
+        if self.parent():
+            self.parent().historyToggled = False
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        
-        # Only draw outlines if more than one color is selected overall.
-        if len(self.selectedIndices) <= 1:
-            return
 
         painter = QPainter(self)
+
+        from tiinyswatch.ui.styles.dark_style_sheet import BORDER
+        borderPen = QPen(QColor(BORDER))
+        borderPen.setWidth(1)
+        painter.setPen(borderPen)
+        painter.setBrush(Qt.NoBrush)
+        w, h = self.width() - 1, self.height() - 1
+        painter.drawLine(0, 0, w, 0)
+        painter.drawLine(0, h, w, h)
+        painter.drawLine(0, 0, 0, h)
+        painter.drawLine(w, 0, w, h)
+
+        if len(self.selectedIndices) <= 1:
+            painter.end()
+            return
+
         pen = QPen(Qt.white)
-        pen.setWidth(2)  # Same weight as the current selection border.
+        pen.setWidth(2)
         pen.setStyle(Qt.DotLine)
         painter.setPen(pen)
-        
-        # Group selected indices by their row.
+
         rows = {}
         for i in self.selectedIndices:
             if i < len(self.colorButtons):
                 row = i // self.GRID_COLUMNS
                 rows.setdefault(row, []).append(i)
-        
-        # For each row, partition the selected indices into contiguous segments.
+
         for row, indices in rows.items():
             indices.sort()
             segments = []
             current_segment = [indices[0]]
             for idx in indices[1:]:
-                # If the index is exactly one more than the previous, it's contiguous.
                 if idx == current_segment[-1] + 1:
                     current_segment.append(idx)
                 else:
@@ -310,21 +358,19 @@ class HistoryPalette(QWidget):
                     current_segment = [idx]
             if current_segment:
                 segments.append(current_segment)
-            
-            # For each contiguous segment, calculate and draw its bounding rectangle.
+
             for segment in segments:
                 boundingRect = None
                 for idx in segment:
-                    widgetRect = self.colorButtons[idx].geometry()  # Already in parent's coordinates.
+                    widgetRect = self.colorButtons[idx].geometry()
                     if boundingRect is None:
                         boundingRect = widgetRect
                     else:
                         boundingRect = boundingRect.united(widgetRect)
                 if boundingRect is not None:
-                    # Expand the rectangle by 1 pixel in each direction so the outline sits outside the buttons.
                     boundingRect = boundingRect.adjusted(-2, -2, 2, 2)
                     painter.drawRect(boundingRect)
-        
+
         painter.end()
 
     def mousePressEvent(self, event):

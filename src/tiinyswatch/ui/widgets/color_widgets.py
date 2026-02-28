@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QWidget, QLabel, QHBoxLayout, QPushButton, QGraphicsOpacityEffect
+from PySide6.QtWidgets import QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QWidget, QLabel, QHBoxLayout, QPushButton, QGraphicsOpacityEffect, QSizePolicy
 from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtCore import Qt, QSize, QPropertyAnimation, QAbstractAnimation, Property, QEasingCurve, QEvent, Signal, QTimer
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
@@ -12,25 +12,12 @@ class ClickableLineEdit(QLineEdit):
     A custom clickable line edit for displaying CSS gradient strings.
     """
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(parent, objectName="ClickableLineEdit")
         self.setReadOnly(True)
         self.setCursor(Qt.PointingHandCursor)
-        self.default_style = "QLineEdit { border: 1px solid gray; }"
-        self.hover_style = "QLineEdit { border: 1px solid white; }"
-        self.setStyleSheet(self.default_style)
-
-    def enterEvent(self, event):
-        self.setStyleSheet(self.hover_style)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        self.setStyleSheet(self.default_style)
-        super().leaveEvent(event)
 
     def mousePressEvent(self, event):
-        # Copy the gradient text to clipboard (assumes ClipboardManager exists).
         ClipboardManager.copyTextToClipboard(self.text())
-        self.setStyleSheet(self.hover_style)
         super().mousePressEvent(event)
 
 class ValueControlWidget(QWidget):
@@ -679,32 +666,38 @@ class ExpandableColorBlocksWidget(QWidget):
     def get_colors(self):
         return [block.color for block in self.blocks]
     
-class CircularButton(QPushButton):
-    def __init__(self, icon=None, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(16, 16)
+class IconButton(QPushButton):
+    def __init__(self, icon=None, parent=None, *, size=20, icon_size=14):
+        super().__init__(parent, objectName="IconButton")
+        self.setFixedSize(size, size)
         if icon:
             self.setIcon(icon)
-            self.setIconSize(QSize(10, 10))
+            self.setIconSize(QSize(icon_size, icon_size))
         self.setCursor(Qt.PointingHandCursor)
-        self.setStyleSheet(
-            "QPushButton { border: 1px solid #888; border-radius: 8px; background: transparent; }"
-            "QPushButton:hover { background-color: #444; border-color: #DDD; }"
-        )
+
+class TopBarButton(QPushButton):
+    """Button that swaps to a lighter icon on hover for contrast against colored backgrounds."""
+    def __init__(self, icon_fn, object_name, parent=None):
+        super().__init__(parent, objectName=object_name)
+        from tiinyswatch.ui.styles.dark_style_sheet import TEXT_SECONDARY, TEXT
+        self._icon_default = icon_fn(color=TEXT_SECONDARY)
+        self._icon_hover = icon_fn(color=TEXT)
+        self.setIcon(self._icon_default)
+        self.setIconSize(QSize(14, 14))
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+
+    def enterEvent(self, event):
+        self.setIcon(self._icon_hover)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.setIcon(self._icon_default)
+        super().leaveEvent(event)
 
 class LineEdit(QLineEdit):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.installEventFilter(self)
 
-    def eventFilter(self, obj, event):
-        if obj == self:
-            if event.type() == QEvent.FocusIn:
-                self.setStyleSheet("QLineEdit { border: 1px solid #7b6cd9; padding: 4px; }")
-            elif event.type() == QEvent.FocusOut:
-                self.setStyleSheet("QLineEdit { border: 1px solid gray; padding: 4px; }")
-        return super().eventFilter(obj, event)
-    
     def setTextWithFocus(self, text):
         if not self.hasFocus():
             self.blockSignals(True)
@@ -736,17 +729,15 @@ class NotificationBanner(QWidget):
         layout.setContentsMargins(10, 5, 10, 5)
         layout.setSpacing(10)
         
-        self.closeButton = QPushButton(self)
+        self.closeButton = QPushButton(self, objectName="BannerClose")
         self.closeButton.setFixedSize(20, 20)
         self.closeButton.setIcon(icons.close_icon(size=14))
         self.closeButton.setIconSize(QSize(14, 14))
-        self.closeButton.setStyleSheet("background: transparent; border: none;")
         self.closeButton.clicked.connect(self.hideBanner)
         layout.addWidget(self.closeButton)
         
-        self.messageLabel = QLabel("", self)
+        self.messageLabel = QLabel("", self, objectName="BannerMessage")
         self.messageLabel.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.messageLabel.setStyleSheet("color: white; background: transparent;")
         layout.addWidget(self.messageLabel)
         
         layout.addStretch()

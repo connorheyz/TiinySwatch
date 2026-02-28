@@ -183,6 +183,18 @@ class Settings:
         cls.set('colors', colors)
 
     @classmethod
+    def appendCurrentColorsToHistory(cls) -> None:
+        """Append all current colors to history in one go (one set, so one updateColors). Order preserved."""
+        current = cls.get('currentColors', [])
+        if not current:
+            return
+        new_entries = [c.clone() for c in reversed(current)]
+        history = new_entries + cls.get('colors', [])
+        if len(history) > 30:
+            history = history[:30]
+        cls.set('colors', history)
+
+    @classmethod
     def removeFromHistory(cls, index: int) -> None:
         """Remove a color at the specified index from history."""
         colors = cls.get('colors', [])

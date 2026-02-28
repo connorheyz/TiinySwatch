@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QCursor
 
-import tiinyswatch.ui.styles as styles
 import tiinyswatch.ui.icons as icons
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.notification_manager import NotificationManager
@@ -16,7 +15,7 @@ from tiinyswatch.ui.widgets.history_palette import HistoryPalette
 from tiinyswatch.ui.controls.color_controls import create_slider_classes_for_format
 from tiinyswatch.ui.controls import ComplementsControl, LinearGradientControl, PantoneControl, ColorTetraControl
 
-from tiinyswatch.ui.widgets.color_widgets import ExpandableColorBlocksWidget, CircularButton, LineEdit, NotificationBanner
+from tiinyswatch.ui.widgets.color_widgets import ExpandableColorBlocksWidget, IconButton, TopBarButton, LineEdit, NotificationBanner
 # Import the new widget
 from tiinyswatch.ui.widgets.format_section_widget import FormatSectionWidget
 
@@ -55,7 +54,7 @@ class ColorPicker(QWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(parent, objectName="ColorPicker")
         self.parent = parent
 
         # Use a list for slider formats.
@@ -81,8 +80,8 @@ class ColorPicker(QWidget):
     # Window Setup
     # ------------------------------
     def initWindow(self):
-        self.setStyleSheet(styles.get_dark_style())
         self.setWindowFlags(ColorPicker.WINDOW_FLAGS)
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self.setMouseTracking(True)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
@@ -96,9 +95,8 @@ class ColorPicker(QWidget):
     # UI Construction
     # ------------------------------
     def initUI(self):
-        # Top-level layout.
         mainLayout = QVBoxLayout(self)
-        mainLayout.setContentsMargins(0, 0, 0, 0)
+        mainLayout.setContentsMargins(1, 1, 1, 1)
         mainLayout.setSpacing(0)
 
         # Header widget.
@@ -116,8 +114,7 @@ class ColorPicker(QWidget):
         contentLayout.addWidget(self.previewContainer)
 
         # HEX display and input.
-        self.hex_label = QLabel("HEX")
-        self.hex_label.setStyleSheet("font-weight: bold")
+        self.hex_label = QLabel("HEX", objectName="HexLabel")
         contentLayout.addWidget(self.hex_label)
         self.hexEdit = LineEdit()
         contentLayout.addWidget(self.hexEdit)
@@ -134,13 +131,9 @@ class ColorPicker(QWidget):
         layout = QHBoxLayout(header)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        self.arrowButton = QPushButton(objectName="ArrowButton")
-        self.arrowButton.setIcon(icons.arrow_left_icon())
-        self.arrowButton.setIconSize(QSize(14, 14))
+        self.arrowButton = TopBarButton(icons.arrow_left_icon, "ArrowButton")
         self.titleLabel = QLabel("TiinySwatch", objectName="TitleText", alignment=Qt.AlignCenter)
-        self.closeButton = QPushButton(objectName="CloseButton")
-        self.closeButton.setIcon(icons.close_icon())
-        self.closeButton.setIconSize(QSize(14, 14))
+        self.closeButton = TopBarButton(icons.close_icon, "CloseButton")
         layout.addWidget(self.arrowButton)
         layout.addWidget(self.titleLabel)
         layout.addStretch()
@@ -174,7 +167,7 @@ class ColorPicker(QWidget):
         if len(self.format_sections) < 4:
             plusLayout = QHBoxLayout()
             plusLayout.addStretch()
-            plusButton = CircularButton(icons.plus_icon(), self)
+            plusButton = IconButton(icons.plus_icon(), self)
             plusButton.clicked.connect(self.addFormat)
             plusLayout.addWidget(plusButton)
             self.formatContainer.addLayout(plusLayout)
@@ -214,8 +207,6 @@ class ColorPicker(QWidget):
         if not available:
             return
         menu = QMenu(self)
-        menu.setStyleSheet(styles.get_dark_style())
-        # Create submenus for each category.
         for category, formats in ColorPicker.FORMAT_CATEGORIES.items():
             submenu = menu.addMenu(category)
             for fmt in formats:
@@ -293,9 +284,7 @@ class ColorPicker(QWidget):
             self.updateUI()
 
     def onSave(self):
-        current_colors = Settings.get("currentColors")
-        for col in current_colors:
-            Settings.appendToHistory(col)
+        Settings.appendCurrentColorsToHistory()
 
     def toggleHistory(self):
         if not self.history:
@@ -311,7 +300,6 @@ class ColorPicker(QWidget):
 
     def showFormatPopup(self, section_index):
         menu = QMenu(self)
-        menu.setStyleSheet(styles.get_dark_style())
         current_fmt = self.format_sections[section_index]
         # Build submenus based on the defined categories.
         for category, formats in ColorPicker.FORMAT_CATEGORIES.items():

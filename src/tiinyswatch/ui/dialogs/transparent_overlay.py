@@ -4,7 +4,6 @@ from PySide6.QtGui import QPainter, QCursor, QColor, QPixmap, QPen
 from PySide6 import QtWidgets
 from tiinyswatch.utils.settings import Settings
 from tiinyswatch.utils.clipboard_manager import ClipboardManager
-from tiinyswatch.ui.styles import get_dark_style
 from tiinyswatch.color import QColorEnhanced
 
 class TransparentOverlay(QDialog):
@@ -37,7 +36,6 @@ class TransparentOverlay(QDialog):
         self.averageColor = None
         self.selectedColors = []
 
-        self.setStyleSheet(get_dark_style())
         QApplication.setOverrideCursor(Qt.CrossCursor)
 
         # Zoom settings.
@@ -325,9 +323,9 @@ class TransparentOverlay(QDialog):
         if (len(self.selectedColors) > 0):
             Settings.set("currentColors", self.selectedColors)
             Settings.set("selectedIndex", len(self.selectedColors) - 1)
-            for color in Settings.get("currentColors"):
-                Settings.appendToHistory(color)
-                if Settings.get("CLIPBOARD"):
+            Settings.appendCurrentColorsToHistory()
+            if Settings.get("CLIPBOARD"):
+                for color in self.selectedColors:
                     ClipboardManager.copyColorToClipboard(color)
         QApplication.restoreOverrideCursor()
         self.parent.overlay = None
