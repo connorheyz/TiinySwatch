@@ -1,5 +1,5 @@
 #define MyAppName "TiinySwatch"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Connor Hayes"
 #define MyAppURL "https://github.com/connorheyz/TiinySwatch"
 #define MyAppExeName "TiinySwatch.exe"
